@@ -335,14 +335,14 @@ def ai_coach():
     if not user_message:
         return jsonify({"error": "message required"}), 400
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        return jsonify({"reply": "AI coach is not configured yet. Add your OPENAI_API_KEY in Render environment variables."}), 200
+        return jsonify({"reply": "AI coach is not configured yet. Add your OPENROUTER_API_KEY in Railway environment variables."}), 200
 
     try:
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
         chat = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="mistralai/mistral-7b-instruct:free",
             max_tokens=512,
             messages=[
                 {
