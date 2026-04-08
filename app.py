@@ -64,6 +64,32 @@ def send_verification_email(to_email, username, code):
         server.send_message(msg)
 
 
+def send_password_reset_email(to_email, username, code):
+    smtp_email = os.getenv("SMTP_EMAIL")
+    smtp_app_password = os.getenv("SMTP_APP_PASSWORD")
+
+    if not smtp_email or not smtp_app_password:
+        raise RuntimeError(
+            "Email sending is not configured. Add SMTP_EMAIL and SMTP_APP_PASSWORD in Railway environment variables."
+        )
+
+    msg = EmailMessage()
+    msg["Subject"] = "StudyTrack password reset code"
+    msg["From"] = smtp_email
+    msg["To"] = to_email
+    msg.set_content(
+        f"Hi {username},\n\n"
+        f"Your StudyTrack password reset code is: {code}\n\n"
+        "It expires in 10 minutes.\n\n"
+        "If you did not request a password reset, you can ignore this email."
+    )
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(smtp_email, smtp_app_password)
+        server.send_message(msg)
+
+
 def ensure_user_email_verification_columns():
     conn = get_db()
     cur = conn.cursor()
@@ -71,6 +97,8 @@ def ensure_user_email_verification_columns():
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code TEXT")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_expires_at TIMESTAMPTZ")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_code TEXT")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ")
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx "
         "ON users (email) WHERE email IS NOT NULL"
@@ -257,6 +285,109 @@ def verify_email():
         cur.close()
         conn.close()
         return jsonify({"message": "Email verified. You can now log in."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# POST /api/forgot-password
+# Body: { "email": "..." }
+# ─────────────────────────────────────────────
+@app.route("/api/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json()
+    email = data.get("email", "").strip().lower()
+
+    if not email:
+        return jsonify({"error": "Email required"}), 400
+
+    if not is_valid_email(email):
+        return jsonify({"error": "Enter a valid email address"}), 400
+
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, username FROM users WHERE email = %s",
+            (email,)
+        )
+        row = cur.fetchone()
+
+        if row:
+            user_id, username = row
+            reset_code = generate_verification_code()
+            expires_at = datetime.utcnow() + timedelta(minutes=10)
+            cur.execute(
+                "UPDATE users SET password_reset_code = %s, password_reset_expires_at = %s WHERE id = %s",
+                (reset_code, expires_at, user_id)
+            )
+            send_password_reset_email(email, username, reset_code)
+            conn.commit()
+
+        cur.close()
+        conn.close()
+        return jsonify({"message": "If an account exists for that email, a reset code has been sent."}), 200
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# POST /api/reset-password
+# Body: { "email": "...", "code": "123456", "new_password": "..." }
+# ─────────────────────────────────────────────
+@app.route("/api/reset-password", methods=["POST"])
+def reset_password():
+    data = request.get_json()
+    email = data.get("email", "").strip().lower()
+    code = data.get("code", "").strip()
+    new_password = data.get("new_password", "")
+
+    if not email or not code or not new_password:
+        return jsonify({"error": "Email, reset code, and new password required"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, password_reset_code, password_reset_expires_at FROM users WHERE email = %s",
+            (email,)
+        )
+        row = cur.fetchone()
+
+        if row is None:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid reset request"}), 400
+
+        user_id, stored_code, expires_at = row
+
+        if stored_code != code:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid reset code"}), 400
+
+        now = datetime.now(expires_at.tzinfo) if expires_at and getattr(expires_at, "tzinfo", None) else datetime.utcnow()
+        if expires_at is None or expires_at < now:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Reset code expired. Request a new one."}), 400
+
+        new_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+        cur.execute(
+            "UPDATE users SET password_hash = %s, password_reset_code = NULL, password_reset_expires_at = NULL WHERE id = %s",
+            (new_hash, user_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Password reset successful. You can now log in."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
