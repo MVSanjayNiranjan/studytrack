@@ -177,6 +177,27 @@
   .quick-prompt:hover { border-color: var(--accent); color: var(--accent); }
   @media (max-width: 600px) { .ai-coach-layout { flex-direction: column; } .chat-history-sidebar { width: 100%; } .history-list { max-height: 160px; } }
 
+  /* ── HISTORY MODAL ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 560px; max-height: 80vh; display: flex; flex-direction: column; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+  .modal-header h2 { font-size: 1rem; font-weight: 700; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 4px 8px; border-radius: 6px; transition: color .2s; }
+  .modal-close:hover { color: var(--text); }
+  .modal-search { padding: 12px 20px; border-bottom: 1px solid var(--border); }
+  .modal-search input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none; }
+  .modal-search input:focus { border-color: var(--accent); }
+  .modal-body { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .modal-body::-webkit-scrollbar { width: 4px; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .modal-hist-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface2); border: 1px solid transparent; cursor: pointer; transition: all .2s; }
+  .modal-hist-item:hover { border-color: var(--accent); }
+  .modal-hist-item .mhi-title { flex: 1; font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal-hist-item .mhi-date { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+  .modal-hist-item .mhi-del { font-size: 0.75rem; color: var(--danger); background: none; border: none; cursor: pointer; opacity: 0; padding: 4px 6px; border-radius: 4px; transition: opacity .2s; }
+  .modal-hist-item:hover .mhi-del { opacity: 1; }
+
   /* ── CHARTS ── */
   .chart-container { position: relative; height: 260px; }
 
@@ -197,6 +218,22 @@
 <body>
 
 <div id="toast-container"></div>
+
+<!-- ── HISTORY MODAL ── -->
+<div id="history-modal" style="display:none" class="modal-overlay" onclick="closeHistoryModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>All Conversations</h2>
+      <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
+    </div>
+    <div class="modal-search">
+      <input type="text" id="history-search" placeholder="Search conversations…" oninput="filterHistoryModal()" />
+    </div>
+    <div class="modal-body" id="history-modal-list">
+      <div class="empty"><div class="empty-icon">💬</div><p>No conversations yet</p></div>
+    </div>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════
      AUTH SCREEN
@@ -407,6 +444,7 @@
             <div class="history-list" id="history-list">
               <div style="font-size:0.78rem;color:var(--muted);padding:8px 4px">No conversations yet</div>
             </div>
+            <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;font-size:0.78rem" onclick="openHistoryModal()">📋 View All History</button>
           </div>
           <!-- Main chat -->
           <div class="chat-main">
@@ -957,7 +995,12 @@ async function loadChatSessions() {
   const res = await apiFetch('/api/chat/sessions');
   if (!res) return;
   const sessions = await res.json();
+  allSessionsCache = sessions;
   renderHistorySidebar(sessions);
+  // Refresh modal list if modal is open
+  if (document.getElementById('history-modal').style.display !== 'none') {
+    filterHistoryModal();
+  }
 }
 
 function renderHistorySidebar(sessions) {
@@ -1065,6 +1108,75 @@ async function sendChat() {
   }
 }
 
+// ─────────────────────────────────────────────
+// HISTORY MODAL
+// ─────────────────────────────────────────────
+let allSessionsCache = [];
+
+function openHistoryModal() {
+  document.getElementById('history-modal').style.display = 'flex';
+  document.getElementById('history-search').value = '';
+  renderHistoryModal(allSessionsCache);
+  setTimeout(() => document.getElementById('history-search').focus(), 100);
+}
+
+function closeHistoryModal(e) {
+  if (e && e.target !== document.getElementById('history-modal')) return;
+  document.getElementById('history-modal').style.display = 'none';
+}
+
+function filterHistoryModal() {
+  const q = document.getElementById('history-search').value.toLowerCase();
+  const filtered = q ? allSessionsCache.filter(s => s.title.toLowerCase().includes(q)) : allSessionsCache;
+  renderHistoryModal(filtered);
+}
+
+function renderHistoryModal(sessions) {
+  const list = document.getElementById('history-modal-list');
+  if (!sessions.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">💬</div><p>No conversations found</p></div>';
+    return;
+  }
+  list.innerHTML = sessions.map(s => {
+    const date = new Date(s.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return `
+      <div class="modal-hist-item" onclick="openSessionFromModal(${s.id}, this)">
+        <span class="mhi-title" title="${escHtml(s.title)}">${escHtml(s.title)}</span>
+        <span class="mhi-date">${date}</span>
+        <button class="mhi-del" onclick="deleteSessionFromModal(event, ${s.id})" title="Delete">✕</button>
+      </div>`;
+  }).join('');
+}
+
+async function openSessionFromModal(sessionId, el) {
+  const item = el.closest ? el.closest('.modal-hist-item') : el;
+  const titleEl = item.querySelector('.mhi-title');
+  // Find the sidebar item and simulate a click
+  const sidebarItem = document.getElementById(`hist-${sessionId}`);
+  if (sidebarItem) {
+    await loadSession(sessionId, sidebarItem);
+  } else {
+    await loadSession(sessionId, { classList: { add: ()=>{}, remove: ()=>{} }, querySelector: () => titleEl });
+    document.getElementById('chat-session-title').textContent = titleEl ? titleEl.textContent : 'Conversation';
+  }
+  document.getElementById('history-modal').style.display = 'none';
+  // Switch to AI tab if not already there
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-ai').classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => { if (b.textContent.trim() === 'AI Coach') b.classList.add('active'); });
+}
+
+async function deleteSessionFromModal(e, sessionId) {
+  e.stopPropagation();
+  const res = await apiFetch(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
+  if (!res) return;
+  if (currentSessionId === sessionId) newChat();
+  await loadChatSessions();
+  renderHistoryModal(allSessionsCache);
+  toast('Conversation deleted', 'info');
+}
+
 // ═══════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════
@@ -1081,6 +1193,9 @@ if (token) {
   startApp(username || 'Student');
 }
 updatePomoDisplay();
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('history-modal').style.display = 'none';
+});
 </script>
 </body>
 </html>
