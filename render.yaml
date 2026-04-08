@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: studytrack
+    runtime: python
+    region: ohio
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: JWT_SECRET_KEY
+        value: studytrack-super-secret-jwt-key-change-this-in-production
+      - key: DATABASE_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>StudyTrack</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --surface2: #22223a;
+    --border: #2e2e4a;
+    --accent: #7c6af7;
+    --accent2: #5eead4;
+    --accent3: #f97316;
+    --danger: #ef4444;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --text: #e2e2f0;
+    --muted: #6b6b8a;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* ── TOAST ── */
+  #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+  .toast { padding: 12px 20px; border-radius: var(--radius-sm); font-size: 0.875rem; font-weight: 500; animation: slideIn .3s ease; max-width: 320px; }
+  .toast.success { background: #14532d; border: 1px solid var(--success); color: #86efac; }
+  .toast.error   { background: #450a0a; border: 1px solid var(--danger);  color: #fca5a5; }
+  .toast.info    { background: #1e1b4b; border: 1px solid var(--accent);  color: #c4b5fd; }
+  @keyframes slideIn { from { opacity:0; transform: translateX(40px); } to { opacity:1; transform: translateX(0); } }
+
+  /* ── AUTH ── */
+  #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  .auth-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 40px; width: 100%; max-width: 420px; }
+  .auth-logo { text-align: center; margin-bottom: 32px; }
+  .auth-logo h1 { font-size: 2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .auth-logo p { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+  .auth-tabs { display: flex; background: var(--surface2); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 28px; }
+  .auth-tab { flex: 1; padding: 10px; text-align: center; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500; color: var(--muted); transition: all .2s; }
+  .auth-tab.active { background: var(--accent); color: #fff; }
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+  .field input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; color: var(--text); font-size: 0.95rem; outline: none; transition: border-color .2s; }
+  .field input:focus { border-color: var(--accent); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 20px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: all .2s; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-primary:hover { background: #6b59e8; }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-danger  { background: var(--danger); color: #fff; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 7px 14px; font-size: 0.8rem; }
+  .btn-icon { padding: 8px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; transition: all .2s; font-size: 1rem; }
+  .btn-icon:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ── APP ── */
+  #app { display: none; }
+  .navbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 100; }
+  .nav-brand { font-size: 1.2rem; font-weight: 800; background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+  .nav-user { font-size: 0.85rem; color: var(--muted); }
+  .nav-user span { color: var(--accent2); font-weight: 600; }
+
+  /* ── TABS ── */
+  .tab-bar { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; padding: 0 24px; overflow-x: auto; }
+  .tab-btn { padding: 16px 20px; font-size: 0.875rem; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: all .2s; background: none; border-top: none; border-left: none; border-right: none; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── CONTENT ── */
+  .content { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .section-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; }
+
+  /* ── GRID ── */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+  /* ── CARDS ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .card-title { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+
+  /* ── STAT CARDS ── */
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .stat-label { font-size: 0.78rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+  .stat-value { font-size: 2rem; font-weight: 800; margin: 6px 0 4px; }
+  .stat-sub { font-size: 0.8rem; color: var(--muted); }
+
+  /* ── POMODORO ── */
+  .pomo-wrap { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  .pomo-ring-wrap { position: relative; width: 220px; height: 220px; }
+  .pomo-ring-wrap svg { transform: rotate(-90deg); }
+  .pomo-ring-bg { fill: none; stroke: var(--surface2); stroke-width: 10; }
+  .pomo-ring-fg { fill: none; stroke: var(--accent); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset .9s linear; }
+  .pomo-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .pomo-time { font-size: 2.8rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .pomo-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .pomo-controls { display: flex; gap: 12px; }
+  .pomo-controls .btn { min-width: 110px; }
+  .pomo-subject { width: 100%; }
+  .pomo-sessions { font-size: 0.85rem; color: var(--muted); }
+  .pomo-sessions span { color: var(--accent2); font-weight: 700; font-size: 1rem; }
+
+  /* ── ATTENDANCE ── */
+  .att-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .att-form input, .att-form select { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none; }
+  .att-form input:focus, .att-form select:focus { border-color: var(--accent); }
+  .att-form input[type="date"] { flex: 1; min-width: 140px; }
+  .att-form input[type="text"]  { flex: 2; min-width: 160px; }
+  .att-table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 14px; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+  td { padding: 12px 14px; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
+  .badge-present { background: #14532d44; color: #86efac; border: 1px solid #22c55e55; }
+  .badge-late    { background: #78350f44; color: #fcd34d; border: 1px solid #f59e0b55; }
+  .badge-absent  { background: #450a0a44; color: #fca5a5; border: 1px solid #ef444455; }
+
+  /* ── TASKS ── */
+  .task-form { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+  .task-form input { flex: 2; min-width: 160px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none; }
+  .task-form input:focus { border-color: var(--accent); }
+  .task-form select { flex: 1; min-width: 120px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none; }
+  .task-list { display: flex; flex-direction: column; gap: 8px; }
+  .task-item { display: flex; align-items: center; gap: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; transition: all .2s; }
+  .task-item.completed { opacity: .5; }
+  .task-item.completed .task-title { text-decoration: line-through; }
+  .task-check { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--border); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .2s; background: transparent; }
+  .task-check.checked { background: var(--success); border-color: var(--success); }
+  .task-check.checked::after { content: '✓'; color: #fff; font-size: 0.75rem; font-weight: 700; }
+  .task-title { flex: 1; font-size: 0.9rem; }
+  .task-subject { font-size: 0.75rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 2px 10px; border-radius: 99px; }
+  .task-delete { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 4px; border-radius: 6px; transition: all .2s; }
+  .task-delete:hover { color: var(--danger); background: #450a0a55; }
+  .tasks-filter { display: flex; gap: 8px; margin-bottom: 16px; }
+  .filter-btn { padding: 6px 16px; border-radius: 99px; font-size: 0.8rem; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface2); color: var(--muted); transition: all .2s; }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ── AI COACH ── */
+  .chat-wrap { display: flex; flex-direction: column; height: 480px; }
+  .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 14px; }
+  .chat-messages::-webkit-scrollbar { width: 4px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .msg { max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 0.875rem; line-height: 1.6; }
+  .msg-user { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg-bot  { background: var(--surface); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
+  .msg-bot.typing { color: var(--muted); font-style: italic; }
+  .chat-input-row { display: flex; gap: 10px; }
+  .chat-input-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; color: var(--text); font-size: 0.9rem; outline: none; }
+  .chat-input-row input:focus { border-color: var(--accent); }
+  .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .quick-prompt { padding: 6px 14px; border-radius: 99px; font-size: 0.78rem; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; transition: all .2s; }
+  .quick-prompt:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── CHARTS ── */
+  .chart-container { position: relative; height: 260px; }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
+  .empty p { font-size: 0.875rem; }
+
+  /* ── LOADING ── */
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── PROGRESS BAR ── */
+  .progress-bar-wrap { background: var(--surface2); border-radius: 99px; height: 8px; overflow: hidden; margin-top: 6px; }
+  .progress-bar { height: 100%; border-radius: 99px; transition: width .4s ease; }
+</style>
+</head>
+<body>
+
+<div id="toast-container"></div>
+
+<!-- ═══════════════════════════════════════
+     AUTH SCREEN
+════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h1>StudyTrack</h1>
+      <p>Your personal productivity companion</p>
+    </div>
+    <div class="auth-tabs">
+      <div class="auth-tab active" onclick="switchAuthTab('login')">Login</div>
+      <div class="auth-tab" onclick="switchAuthTab('register')">Register</div>
+    </div>
+    <form id="auth-form" onsubmit="handleAuth(event)">
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="auth-username" placeholder="Enter username" autocomplete="username" required />
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="auth-password" placeholder="Enter password" autocomplete="current-password" required />
+      </div>
+      <button class="btn btn-primary" id="auth-btn" type="submit">Login</button>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MAIN APP
+════════════════════════════════════════ -->
+<div id="app">
+  <nav class="navbar">
+    <div class="nav-brand">StudyTrack</div>
+    <div class="nav-right">
+      <div class="nav-user">Welcome, <span id="nav-username"></span></div>
+      <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('dashboard')">Dashboard</button>
+    <button class="tab-btn" onclick="switchTab('pomodoro')">Pomodoro</button>
+    <button class="tab-btn" onclick="switchTab('attendance')">Attendance</button>
+    <button class="tab-btn" onclick="switchTab('tasks')">Tasks</button>
+    <button class="tab-btn" onclick="switchTab('charts')">Charts</button>
+    <button class="tab-btn" onclick="switchTab('ai')">AI Coach</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ── DASHBOARD ── -->
+    <div class="tab-panel active" id="tab-dashboard">
+      <div class="section-title">Overview</div>
+      <div class="grid-3" style="margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-label">Study Hours (7d)</div>
+          <div class="stat-value" id="stat-hours" style="color:var(--accent)">—</div>
+          <div class="stat-sub">Pomodoro sessions</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Attendance Rate</div>
+          <div class="stat-value" id="stat-att" style="color:var(--accent2)">—</div>
+          <div class="progress-bar-wrap"><div class="progress-bar" id="att-bar" style="background:var(--accent2);width:0%"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Pending Tasks</div>
+          <div class="stat-value" id="stat-tasks" style="color:var(--accent3)">—</div>
+          <div class="stat-sub">tasks remaining</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">Recent Tasks</div>
+          <div id="dash-tasks"><div class="empty"><div class="empty-icon">📋</div><p>No tasks yet</p></div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Attendance (Last 7 days)</div>
+          <div id="dash-attendance"><div class="empty"><div class="empty-icon">📅</div><p>No records yet</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── POMODORO ── -->
+    <div class="tab-panel" id="tab-pomodoro">
+      <div class="section-title">Pomodoro Timer</div>
+      <div class="card" style="max-width:480px;margin:0 auto">
+        <div class="pomo-wrap">
+          <div class="pomo-ring-wrap">
+            <svg width="220" height="220" viewBox="0 0 220 220">
+              <circle class="pomo-ring-bg" cx="110" cy="110" r="95"/>
+              <circle class="pomo-ring-fg" id="pomo-ring" cx="110" cy="110" r="95"
+                stroke-dasharray="596.9" stroke-dashoffset="0"/>
+            </svg>
+            <div class="pomo-center">
+              <div class="pomo-time" id="pomo-display">25:00</div>
+              <div class="pomo-label" id="pomo-mode-label">Focus</div>
+            </div>
+          </div>
+          <div style="width:100%">
+            <div class="field" style="margin-bottom:0">
+              <label>Subject</label>
+              <input type="text" id="pomo-subject" class="pomo-subject" placeholder="e.g. Mathematics" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-size:0.9rem;outline:none;" />
+            </div>
+          </div>
+          <div class="pomo-controls">
+            <button class="btn btn-primary" id="pomo-start-btn" onclick="pomodoroToggle()">▶ Start</button>
+            <button class="btn btn-outline" onclick="pomodoroReset()">↺ Reset</button>
+          </div>
+          <div class="pomo-sessions">Sessions today: <span id="pomo-session-count">0</span></div>
+          <div id="pomo-mode-switcher" style="display:flex;gap:8px">
+            <button class="filter-btn active" onclick="setPomoMode('focus',this)">Focus 25m</button>
+            <button class="filter-btn" onclick="setPomoMode('short',this)">Short Break 5m</button>
+            <button class="filter-btn" onclick="setPomoMode('long',this)">Long Break 15m</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ATTENDANCE ── -->
+    <div class="tab-panel" id="tab-attendance">
+      <div class="section-title">Attendance</div>
+      <div class="card">
+        <div class="card-title">Mark Attendance</div>
+        <div class="att-form">
+          <input type="date" id="att-date" />
+          <input type="text" id="att-subject" placeholder="Subject (e.g. Physics)" />
+          <select id="att-status">
+            <option value="Present">✅ Present</option>
+            <option value="Late">⏰ Late</option>
+            <option value="Absent">❌ Absent</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="markAttendance()">Save</button>
+        </div>
+        <div class="att-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th><th>Subject</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="att-tbody">
+              <tr><td colspan="3"><div class="empty"><div class="empty-icon">📅</div><p>No records yet</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TASKS ── -->
+    <div class="tab-panel" id="tab-tasks">
+      <div class="section-title">Task Manager</div>
+      <div class="card">
+        <div class="card-title">Add Task</div>
+        <div class="task-form" style="margin-bottom:14px">
+          <input type="text" id="task-title" placeholder="Task description..." />
+          <select id="task-subject">
+            <option value="General">General</option>
+            <option value="Mathematics">Mathematics</option>
+            <option value="Physics">Physics</option>
+            <option value="Chemistry">Chemistry</option>
+            <option value="Biology">Biology</option>
+            <option value="History">History</option>
+            <option value="English">English</option>
+            <option value="Computer Science">Computer Science</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="addTask()">+ Add</button>
+        </div>
+        <div class="tasks-filter">
+          <button class="filter-btn active" onclick="filterTasks('all',this)">All</button>
+          <button class="filter-btn" onclick="filterTasks('pending',this)">Pending</button>
+          <button class="filter-btn" onclick="filterTasks('done',this)">Completed</button>
+        </div>
+        <div class="task-list" id="task-list">
+          <div class="empty"><div class="empty-icon">✅</div><p>No tasks yet. Add one above!</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CHARTS ── -->
+    <div class="tab-panel" id="tab-charts">
+      <div class="section-title">Productivity Charts</div>
+      <div class="grid-2" style="margin-bottom:20px">
+        <div class="card">
+          <div class="card-title">Study Hours (Last 7 Days)</div>
+          <div class="chart-container"><canvas id="chart-hours"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Attendance Status Breakdown</div>
+          <div class="chart-container"><canvas id="chart-att"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Study Time by Subject</div>
+        <div class="chart-container"><canvas id="chart-subject"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── AI COACH ── -->
+    <div class="tab-panel" id="tab-ai">
+      <div class="section-title">AI Study Coach</div>
+      <div class="card">
+        <div class="quick-prompts">
+          <span style="font-size:0.78rem;color:var(--muted);align-self:center">Quick ask:</span>
+          <button class="quick-prompt" onclick="quickPrompt(this)">How to focus better?</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">Best revision techniques?</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">How to reduce exam stress?</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">Create a study schedule</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">Pomodoro tips?</button>
+        </div>
+        <div class="chat-wrap">
+          <div class="chat-messages" id="chat-messages">
+            <div class="msg msg-bot">
+              👋 Hi! I'm your AI Study Coach. Ask me anything about studying, focus, time management, or exam prep!
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Ask your study coach..." onkeydown="if(event.key==='Enter')sendChat()" />
+            <button class="btn btn-primary" onclick="sendChat()" id="chat-send-btn">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const API = '';   // same origin — Flask serves both
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let token = localStorage.getItem('st_token');
+let username = localStorage.getItem('st_username');
+let allTasks = [];
+let taskFilter = 'all';
+let pomodoroInterval = null;
+let pomodoroRunning = false;
+let pomodoroSeconds = 25 * 60;
+let pomodoroTotal   = 25 * 60;
+let pomodoroMode    = 'focus';
+let pomodoroSessionsToday = 0;
+let charts = {};
+
+// ═══════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════
+function toast(msg, type = 'info', duration = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ═══════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════
+let authMode = 'login';
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  document.querySelectorAll('.auth-tab').forEach((t,i) => {
+    t.classList.toggle('active', (i===0 && mode==='login') || (i===1 && mode==='register'));
+  });
+  document.getElementById('auth-btn').textContent = mode === 'login' ? 'Login' : 'Create Account';
+  document.getElementById('auth-password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  const username = document.getElementById('auth-username').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const btn = document.getElementById('auth-btn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+
+  const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast(data.error || 'Something went wrong', 'error');
+      return;
+    }
+
+    if (authMode === 'register') {
+      toast('Account created! Please log in.', 'success');
+      switchAuthTab('login');
+      return;
+    }
+
+    // Login success
+    localStorage.setItem('st_token', data.token);
+    localStorage.setItem('st_username', data.username);
+    token = data.token;
+    startApp(data.username);
+
+  } catch (err) {
+    toast('Cannot reach server. Is Flask running?', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = authMode === 'login' ? 'Login' : 'Create Account';
+  }
+}
+
+function logout() {
+  localStorage.removeItem('st_token');
+  localStorage.removeItem('st_username');
+  token = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  toast('Logged out', 'info');
+  stopPomodoro();
+}
+
+// ═══════════════════════════════════════════════
+// AUTHENTICATED FETCH
+// ═══════════════════════════════════════════════
+async function apiFetch(url, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(url, { ...opts, headers });
+  if (res.status === 401) { logout(); return null; }
+  return res;
+}
+
+// ═══════════════════════════════════════════════
+// APP INIT
+// ═══════════════════════════════════════════════
+function startApp(uname) {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('nav-username').textContent = uname;
+  // Set today's date in attendance form
+  document.getElementById('att-date').value = today();
+  loadDashboard();
+}
+
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ═══════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  event.target.classList.add('active');
+
+  if (name === 'dashboard')  loadDashboard();
+  if (name === 'attendance') loadAttendance();
+  if (name === 'tasks')      loadTasks();
+  if (name === 'charts')     loadCharts();
+}
+
+// ═══════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════
+async function loadDashboard() {
+  const [logs, att, tasks] = await Promise.all([
+    apiFetch('/api/study_logs').then(r => r ? r.json() : []),
+    apiFetch('/api/attendance').then(r => r ? r.json() : []),
+    apiFetch('/api/tasks').then(r => r ? r.json() : [])
+  ]);
+
+  // Study hours last 7 days
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+  const recentLogs = logs.filter(l => new Date(l.date) >= cutoff);
+  const totalMins  = recentLogs.reduce((s, l) => s + l.duration_minutes, 0);
+  document.getElementById('stat-hours').textContent = (totalMins / 60).toFixed(1) + 'h';
+
+  // Attendance rate
+  const present = att.filter(a => a.status === 'Present').length;
+  const rate = att.length ? Math.round((present / att.length) * 100) : 0;
+  document.getElementById('stat-att').textContent = rate + '%';
+  document.getElementById('att-bar').style.width = rate + '%';
+
+  // Pending tasks
+  const pending = tasks.filter(t => !t.completed).length;
+  document.getElementById('stat-tasks').textContent = pending;
+
+  // Recent tasks (last 4)
+  const dashTasks = document.getElementById('dash-tasks');
+  if (tasks.length === 0) {
+    dashTasks.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><p>No tasks yet</p></div>`;
+  } else {
+    dashTasks.innerHTML = tasks.slice(0,4).map(t => `
+      <div class="task-item ${t.completed ? 'completed' : ''}" style="margin-bottom:6px">
+        <div class="task-check ${t.completed ? 'checked' : ''}"></div>
+        <div class="task-title">${escHtml(t.title)}</div>
+        <span class="task-subject">${escHtml(t.subject)}</span>
+      </div>`).join('');
+  }
+
+  // Recent attendance (last 5)
+  const dashAtt = document.getElementById('dash-attendance');
+  const recent  = att.slice(0,5);
+  if (recent.length === 0) {
+    dashAtt.innerHTML = `<div class="empty"><div class="empty-icon">📅</div><p>No records yet</p></div>`;
+  } else {
+    dashAtt.innerHTML = recent.map(a => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:0.85rem">${a.date}</span>
+        <span style="font-size:0.85rem;color:var(--muted)">${escHtml(a.subject)}</span>
+        <span class="badge badge-${a.status.toLowerCase()}">${a.status}</span>
+      </div>`).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// ATTENDANCE
+// ═══════════════════════════════════════════════
+async function loadAttendance() {
+  const tbody = document.getElementById('att-tbody');
+  tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:20px"><div class="spinner"></div></td></tr>`;
+
+  const res = await apiFetch('/api/attendance');
+  if (!res) return;
+  const data = await res.json();
+
+  if (data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3"><div class="empty"><div class="empty-icon">📅</div><p>No records yet</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = data.map(a => `
+    <tr>
+      <td>${a.date}</td>
+      <td>${escHtml(a.subject)}</td>
+      <td><span class="badge badge-${a.status.toLowerCase()}">${a.status}</span></td>
+    </tr>`).join('');
+}
+
+async function markAttendance() {
+  const date    = document.getElementById('att-date').value;
+  const subject = document.getElementById('att-subject').value.trim();
+  const status  = document.getElementById('att-status').value;
+
+  if (!date || !subject) { toast('Please fill in date and subject', 'error'); return; }
+
+  const res = await apiFetch('/api/attendance', {
+    method: 'POST',
+    body: JSON.stringify({ date, subject, status })
+  });
+  if (!res) return;
+
+  if (res.ok) {
+    toast(`Attendance marked: ${status}`, 'success');
+    document.getElementById('att-subject').value = '';
+    loadAttendance();
+  } else {
+    const err = await res.json();
+    toast(err.error || 'Failed to save', 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// TASKS
+// ═══════════════════════════════════════════════
+async function loadTasks() {
+  const res = await apiFetch('/api/tasks');
+  if (!res) return;
+  allTasks = await res.json();
+  renderTasks();
+}
+
+function renderTasks() {
+  const list = document.getElementById('task-list');
+  let tasks = allTasks;
+  if (taskFilter === 'pending')   tasks = tasks.filter(t => !t.completed);
+  if (taskFilter === 'done')      tasks = tasks.filter(t => t.completed);
+
+  if (tasks.length === 0) {
+    list.innerHTML = `<div class="empty"><div class="empty-icon">✅</div><p>${taskFilter === 'done' ? 'No completed tasks' : 'No tasks here!'}</p></div>`;
+    return;
+  }
+
+  list.innerHTML = tasks.map(t => `
+    <div class="task-item ${t.completed ? 'completed' : ''}" id="task-${t.id}">
+      <div class="task-check ${t.completed ? 'checked' : ''}" onclick="toggleTask(${t.id},${!t.completed})"></div>
+      <div class="task-title">${escHtml(t.title)}</div>
+      <span class="task-subject">${escHtml(t.subject)}</span>
+      <button class="task-delete" onclick="deleteTask(${t.id})" title="Delete">🗑</button>
+    </div>`).join('');
+}
+
+function filterTasks(mode, btn) {
+  taskFilter = mode;
+  document.querySelectorAll('.tasks-filter .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTasks();
+}
+
+async function addTask() {
+  const title   = document.getElementById('task-title').value.trim();
+  const subject = document.getElementById('task-subject').value;
+  if (!title) { toast('Enter a task title', 'error'); return; }
+
+  const res = await apiFetch('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ title, subject })
+  });
+  if (!res) return;
+
+  if (res.ok) {
+    document.getElementById('task-title').value = '';
+    toast('Task added!', 'success');
+    loadTasks();
+  } else {
+    const err = await res.json();
+    toast(err.error || 'Failed', 'error');
+  }
+}
+
+async function toggleTask(id, completed) {
+  const res = await apiFetch(`/api/tasks/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ completed })
+  });
+  if (res && res.ok) {
+    const t = allTasks.find(t => t.id === id);
+    if (t) t.completed = completed;
+    renderTasks();
+    toast(completed ? 'Task completed! 🎉' : 'Task reopened', completed ? 'success' : 'info');
+  }
+}
+
+async function deleteTask(id) {
+  const res = await apiFetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  if (res && res.ok) {
+    allTasks = allTasks.filter(t => t.id !== id);
+    renderTasks();
+    toast('Task deleted', 'info');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// POMODORO
+// ═══════════════════════════════════════════════
+const POMO_MODES = { focus: 25*60, short: 5*60, long: 15*60 };
+const CIRCUMFERENCE = 2 * Math.PI * 95; // 596.9
+
+function setPomoMode(mode, btn) {
+  if (pomodoroRunning) return;
+  pomodoroMode = mode;
+  pomodoroSeconds = POMO_MODES[mode];
+  pomodoroTotal   = POMO_MODES[mode];
+  document.querySelectorAll('#pomo-mode-switcher .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('pomo-mode-label').textContent = mode === 'focus' ? 'Focus' : mode === 'short' ? 'Short Break' : 'Long Break';
+  document.getElementById('pomo-ring').style.stroke = mode === 'focus' ? 'var(--accent)' : mode === 'short' ? 'var(--accent2)' : 'var(--accent3)';
+  updatePomoDisplay();
+}
+
+function updatePomoDisplay() {
+  const m = String(Math.floor(pomodoroSeconds / 60)).padStart(2, '0');
+  const s = String(pomodoroSeconds % 60).padStart(2, '0');
+  document.getElementById('pomo-display').textContent = `${m}:${s}`;
+  const progress = pomodoroSeconds / pomodoroTotal;
+  const offset   = CIRCUMFERENCE * (1 - progress);
+  document.getElementById('pomo-ring').style.strokeDashoffset = offset;
+}
+
+function pomodoroToggle() {
+  if (pomodoroRunning) {
+    stopPomodoro();
+    document.getElementById('pomo-start-btn').textContent = '▶ Resume';
+  } else {
+    pomodoroRunning = true;
+    document.getElementById('pomo-start-btn').textContent = '⏸ Pause';
+    pomodoroInterval = setInterval(async () => {
+      pomodoroSeconds--;
+      updatePomoDisplay();
+      if (pomodoroSeconds <= 0) {
+        stopPomodoro();
+        document.getElementById('pomo-start-btn').textContent = '▶ Start';
+        pomodoroSeconds = pomodoroTotal;
+        updatePomoDisplay();
+        if (pomodoroMode === 'focus') {
+          pomodoroSessionsToday++;
+          document.getElementById('pomo-session-count').textContent = pomodoroSessionsToday;
+          toast('🍅 Focus session complete! Great work!', 'success', 5000);
+          await logStudySession();
+        } else {
+          toast('Break over! Ready to focus?', 'info', 4000);
+        }
+      }
+    }, 1000);
+  }
+}
+
+function stopPomodoro() {
+  clearInterval(pomodoroInterval);
+  pomodoroRunning = false;
+}
+
+function pomodoroReset() {
+  stopPomodoro();
+  pomodoroSeconds = pomodoroTotal;
+  updatePomoDisplay();
+  document.getElementById('pomo-start-btn').textContent = '▶ Start';
+}
+
+async function logStudySession() {
+  const subject = document.getElementById('pomo-subject').value.trim() || 'General';
+  await apiFetch('/api/study_logs', {
+    method: 'POST',
+    body: JSON.stringify({ subject, duration_minutes: 25, date: today() })
+  });
+}
+
+// ═══════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════
+async function loadCharts() {
+  const [logs, att] = await Promise.all([
+    apiFetch('/api/study_logs').then(r => r ? r.json() : []),
+    apiFetch('/api/attendance').then(r => r ? r.json() : [])
+  ]);
+
+  // Destroy old charts to avoid duplicates
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  const defaults = {
+    color: '#e2e2f0',
+    borderColor: '#2e2e4a',
+    plugins: { legend: { labels: { color: '#6b6b8a', font: { size: 12 } } } },
+    scales: {
+      x: { ticks: { color: '#6b6b8a' }, grid: { color: '#2e2e4a' } },
+      y: { ticks: { color: '#6b6b8a' }, grid: { color: '#2e2e4a' } }
+    }
+  };
+
+  // ── Study hours last 7 days ──
+  const last7 = [...Array(7)].map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().split('T')[0];
+  });
+  const hoursPerDay = last7.map(d =>
+    logs.filter(l => l.date === d).reduce((s, l) => s + l.duration_minutes, 0) / 60
+  );
+  charts.hours = new Chart(document.getElementById('chart-hours'), {
+    type: 'bar',
+    data: {
+      labels: last7.map(d => d.slice(5)),
+      datasets: [{
+        label: 'Hours',
+        data: hoursPerDay,
+        backgroundColor: '#7c6af755',
+        borderColor: '#7c6af7',
+        borderWidth: 2,
+        borderRadius: 6
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: defaults.plugins, scales: defaults.scales }
+  });
+
+  // ── Attendance breakdown ──
+  const present = att.filter(a => a.status === 'Present').length;
+  const late    = att.filter(a => a.status === 'Late').length;
+  const absent  = att.filter(a => a.status === 'Absent').length;
+  charts.att = new Chart(document.getElementById('chart-att'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Present', 'Late', 'Absent'],
+      datasets: [{
+        data: [present, late, absent],
+        backgroundColor: ['#22c55e55', '#f59e0b55', '#ef444455'],
+        borderColor:     ['#22c55e',   '#f59e0b',   '#ef4444'],
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { ...defaults.plugins, legend: { position: 'right', labels: { color: '#6b6b8a' } } },
+      cutout: '65%'
+    }
+  });
+
+  // ── Study time by subject ──
+  const subjectMap = {};
+  logs.forEach(l => { subjectMap[l.subject] = (subjectMap[l.subject] || 0) + l.duration_minutes / 60; });
+  const subjects = Object.keys(subjectMap);
+  const palette  = ['#7c6af7','#5eead4','#f97316','#22c55e','#ef4444','#f59e0b','#3b82f6','#ec4899'];
+  charts.subject = new Chart(document.getElementById('chart-subject'), {
+    type: 'bar',
+    data: {
+      labels: subjects.length ? subjects : ['No data'],
+      datasets: [{
+        label: 'Hours',
+        data: subjects.length ? subjects.map(s => subjectMap[s].toFixed(1)) : [0],
+        backgroundColor: subjects.map((_, i) => palette[i % palette.length] + '55'),
+        borderColor:     subjects.map((_, i) => palette[i % palette.length]),
+        borderWidth: 2,
+        borderRadius: 6
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: defaults.plugins, scales: defaults.scales }
+  });
+}
+
+// ═══════════════════════════════════════════════
+// AI COACH
+// ═══════════════════════════════════════════════
+function quickPrompt(btn) {
+  document.getElementById('chat-input').value = btn.textContent;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  const box = document.getElementById('chat-messages');
+  input.value = '';
+
+  // User bubble
+  box.innerHTML += `<div class="msg msg-user">${escHtml(msg)}</div>`;
+
+  // Typing indicator
+  const typingId = 'typing-' + Date.now();
+  box.innerHTML += `<div class="msg msg-bot typing" id="${typingId}">StudyCoach is thinking…</div>`;
+  box.scrollTop = box.scrollHeight;
+
+  document.getElementById('chat-send-btn').disabled = true;
+
+  try {
+    const res = await apiFetch('/api/ai_coach', {
+      method: 'POST',
+      body: JSON.stringify({ message: msg })
+    });
+
+    document.getElementById(typingId)?.remove();
+
+    if (!res) return;
+    const data = await res.json();
+
+    if (data.error) {
+      box.innerHTML += `<div class="msg msg-bot" style="color:var(--danger)">${escHtml(data.error)}</div>`;
+    } else {
+      box.innerHTML += `<div class="msg msg-bot">${escHtml(data.reply)}</div>`;
+    }
+  } catch (err) {
+    document.getElementById(typingId)?.remove();
+    box.innerHTML += `<div class="msg msg-bot" style="color:var(--danger)">Could not reach AI coach.</div>`;
+  } finally {
+    document.getElementById('chat-send-btn').disabled = false;
+    box.scrollTop = box.scrollHeight;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════
+if (token) {
+  startApp(username || 'Student');
+}
+updatePomoDisplay();
+</script>
+</body>
+</html>
