@@ -342,7 +342,7 @@ def ai_coach():
     try:
         client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
         chat = client.chat.completions.create(
-            model="mistralai/mistral-7b-instruct:free",
+            model="meta-llama/llama-3.1-8b-instruct:free",
             max_tokens=512,
             messages=[
                 {
