@@ -40,26 +40,28 @@ def is_valid_email(email):
 
 
 def send_email(to_email, subject, body):
-    resend_api_key = os.getenv("RESEND_API_KEY")
+    brevo_api_key = os.getenv("BREVO_API_KEY")
     from_email = os.getenv("FROM_EMAIL")
+    from_name = os.getenv("FROM_NAME", "StudyTrack")
 
-    if resend_api_key and from_email:
+    if brevo_api_key and from_email:
         response = httpx.post(
-            "https://api.resend.com/emails",
+            "https://api.brevo.com/v3/smtp/email",
             headers={
-                "Authorization": f"Bearer {resend_api_key}",
+                "api-key": brevo_api_key,
                 "Content-Type": "application/json",
+                "accept": "application/json",
             },
             json={
-                "from": from_email,
-                "to": [to_email],
+                "sender": {"name": from_name, "email": from_email},
+                "to": [{"email": to_email}],
                 "subject": subject,
-                "text": body,
+                "textContent": body,
             },
             timeout=20.0,
         )
         if response.status_code >= 400:
-            raise RuntimeError(f"Resend error: {response.text}")
+            raise RuntimeError(f"Brevo error: {response.text}")
         return
 
     smtp_email = os.getenv("SMTP_EMAIL")
@@ -67,7 +69,7 @@ def send_email(to_email, subject, body):
 
     if not smtp_email or not smtp_app_password:
         raise RuntimeError(
-            "Email sending is not configured. Add RESEND_API_KEY and FROM_EMAIL in Railway, or use SMTP_EMAIL and SMTP_APP_PASSWORD."
+            "Email sending is not configured. Add BREVO_API_KEY and FROM_EMAIL in Railway, or use SMTP_EMAIL and SMTP_APP_PASSWORD."
         )
 
     msg = EmailMessage()
