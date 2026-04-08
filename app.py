@@ -1,7 +1,7 @@
 import os
 import psycopg2
 import bcrypt
-import anthropic
+from groq import Groq
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -335,24 +335,29 @@ def ai_coach():
     if not user_message:
         return jsonify({"error": "message required"}), 400
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key or api_key == "your-anthropic-api-key-here":
-        return jsonify({"reply": "AI coach is not configured yet. Add your ANTHROPIC_API_KEY to the .env file."}), 200
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        return jsonify({"reply": "AI coach is not configured yet. Add your GROQ_API_KEY in Render environment variables."}), 200
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        client = Groq(api_key=api_key)
+        chat = client.chat.completions.create(
+            model="llama3-8b-8192",
             max_tokens=512,
-            system=(
-                "You are StudyCoach, a friendly AI assistant for students. "
-                "Give concise, practical study advice. "
-                "Focus on study techniques, time management, and motivation. "
-                "Keep responses under 150 words."
-            ),
-            messages=[{"role": "user", "content": user_message}]
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are StudyCoach, a friendly AI assistant for students. "
+                        "Give concise, practical study advice. "
+                        "Focus on study techniques, time management, and motivation. "
+                        "Keep responses under 150 words."
+                    )
+                },
+                {"role": "user", "content": user_message}
+            ]
         )
-        reply = message.content[0].text
+        reply = chat.choices[0].message.content
         return jsonify({"reply": reply}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
