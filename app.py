@@ -1,7 +1,7 @@
 import os
 import psycopg2
 import bcrypt
-from openai import OpenAI
+from groq import Groq
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -335,14 +335,14 @@ def ai_coach():
     if not user_message:
         return jsonify({"error": "message required"}), 400
 
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return jsonify({"reply": "AI coach is not configured yet. Add your OPENROUTER_API_KEY in Railway environment variables."}), 200
+        return jsonify({"reply": "AI coach is not configured yet. Add your GROQ_API_KEY in Railway environment variables."}), 200
 
     try:
-        client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+        client = Groq(api_key=api_key)
         chat = client.chat.completions.create(
-            model="google/gemma-4-31b-it:free",
+            model="llama3-8b-8192",
             max_tokens=512,
             messages=[
                 {
