@@ -146,7 +146,22 @@
   .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   /* ── AI COACH ── */
-  .chat-wrap { display: flex; flex-direction: column; height: 480px; }
+  .ai-coach-layout { display: flex; gap: 16px; align-items: flex-start; }
+  .chat-history-sidebar { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
+  .chat-history-sidebar h3 { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 460px; overflow-y: auto; }
+  .history-list::-webkit-scrollbar { width: 3px; }
+  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .history-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface2); border: 1px solid transparent; cursor: pointer; font-size: 0.8rem; color: var(--muted); transition: all .2s; }
+  .history-item:hover { border-color: var(--border); color: var(--text); }
+  .history-item.active { border-color: var(--accent); color: var(--accent); background: rgba(124,106,247,.1); }
+  .history-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item .del-btn { opacity: 0; font-size: 0.7rem; color: var(--danger); padding: 2px 5px; border-radius: 4px; border: none; background: none; cursor: pointer; transition: opacity .2s; }
+  .history-item:hover .del-btn { opacity: 1; }
+  .chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .chat-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .chat-toolbar .chat-session-title { font-size: 0.85rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .chat-wrap { display: flex; flex-direction: column; height: 420px; }
   .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 14px; }
   .chat-messages::-webkit-scrollbar { width: 4px; }
   .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -160,6 +175,7 @@
   .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
   .quick-prompt { padding: 6px 14px; border-radius: 99px; font-size: 0.78rem; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; transition: all .2s; }
   .quick-prompt:hover { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 600px) { .ai-coach-layout { flex-direction: column; } .chat-history-sidebar { width: 100%; } .history-list { max-height: 160px; } }
 
   /* ── CHARTS ── */
   .chart-container { position: relative; height: 260px; }
@@ -383,23 +399,39 @@
     <div class="tab-panel" id="tab-ai">
       <div class="section-title">AI Study Coach</div>
       <div class="card">
-        <div class="quick-prompts">
-          <span style="font-size:0.78rem;color:var(--muted);align-self:center">Quick ask:</span>
-          <button class="quick-prompt" onclick="quickPrompt(this)">How to focus better?</button>
-          <button class="quick-prompt" onclick="quickPrompt(this)">Best revision techniques?</button>
-          <button class="quick-prompt" onclick="quickPrompt(this)">How to reduce exam stress?</button>
-          <button class="quick-prompt" onclick="quickPrompt(this)">Create a study schedule</button>
-          <button class="quick-prompt" onclick="quickPrompt(this)">Pomodoro tips?</button>
-        </div>
-        <div class="chat-wrap">
-          <div class="chat-messages" id="chat-messages">
-            <div class="msg msg-bot">
-              👋 Hi! I'm your AI Study Coach. Ask me anything about studying, focus, time management, or exam prep!
+        <div class="ai-coach-layout">
+          <!-- Sidebar -->
+          <div class="chat-history-sidebar">
+            <button class="btn btn-primary btn-sm" style="width:100%;margin-bottom:8px" onclick="newChat()">+ New Chat</button>
+            <h3>History</h3>
+            <div class="history-list" id="history-list">
+              <div style="font-size:0.78rem;color:var(--muted);padding:8px 4px">No conversations yet</div>
             </div>
           </div>
-          <div class="chat-input-row">
-            <input type="text" id="chat-input" placeholder="Ask your study coach..." onkeydown="if(event.key==='Enter')sendChat()" />
-            <button class="btn btn-primary" onclick="sendChat()" id="chat-send-btn">Send</button>
+          <!-- Main chat -->
+          <div class="chat-main">
+            <div class="quick-prompts">
+              <span style="font-size:0.78rem;color:var(--muted);align-self:center">Quick ask:</span>
+              <button class="quick-prompt" onclick="quickPrompt(this)">How to focus better?</button>
+              <button class="quick-prompt" onclick="quickPrompt(this)">Best revision techniques?</button>
+              <button class="quick-prompt" onclick="quickPrompt(this)">How to reduce exam stress?</button>
+              <button class="quick-prompt" onclick="quickPrompt(this)">Create a study schedule</button>
+              <button class="quick-prompt" onclick="quickPrompt(this)">Pomodoro tips?</button>
+            </div>
+            <div class="chat-toolbar">
+              <div class="chat-session-title" id="chat-session-title">New Conversation</div>
+            </div>
+            <div class="chat-wrap">
+              <div class="chat-messages" id="chat-messages">
+                <div class="msg msg-bot">
+                  👋 Hi! I'm your AI Study Coach. Ask me anything about studying, focus, time management, or exam prep!
+                </div>
+              </div>
+              <div class="chat-input-row">
+                <input type="text" id="chat-input" placeholder="Ask your study coach..." onkeydown="if(event.key==='Enter')sendChat()" />
+                <button class="btn btn-primary" onclick="sendChat()" id="chat-send-btn">Send</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -502,6 +534,8 @@ function logout() {
   localStorage.removeItem('st_token');
   localStorage.removeItem('st_username');
   token = null;
+  newChat();
+  document.getElementById('history-list').innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:8px 4px">No conversations yet</div>';
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
   toast('Logged out', 'info');
@@ -529,6 +563,8 @@ function startApp(uname) {
   // Set today's date in attendance form
   document.getElementById('att-date').value = today();
   loadDashboard();
+  loadChatSessions();
+  newChat();
 }
 
 function today() {
@@ -548,6 +584,7 @@ function switchTab(name) {
   if (name === 'attendance') loadAttendance();
   if (name === 'tasks')      loadTasks();
   if (name === 'charts')     loadCharts();
+  if (name === 'ai')         loadChatSessions();
 }
 
 // ═══════════════════════════════════════════════
@@ -900,9 +937,79 @@ async function loadCharts() {
 // ═══════════════════════════════════════════════
 // AI COACH
 // ═══════════════════════════════════════════════
+let currentSessionId = null;
+
 function quickPrompt(btn) {
   document.getElementById('chat-input').value = btn.textContent;
   sendChat();
+}
+
+function newChat() {
+  currentSessionId = null;
+  document.getElementById('chat-session-title').textContent = 'New Conversation';
+  document.getElementById('chat-messages').innerHTML = `
+    <div class="msg msg-bot">👋 Hi! I'm your AI Study Coach. Ask me anything about studying, focus, time management, or exam prep!</div>
+  `;
+  document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+}
+
+async function loadChatSessions() {
+  const res = await apiFetch('/api/chat/sessions');
+  if (!res) return;
+  const sessions = await res.json();
+  renderHistorySidebar(sessions);
+}
+
+function renderHistorySidebar(sessions) {
+  const list = document.getElementById('history-list');
+  if (!sessions.length) {
+    list.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:8px 4px">No conversations yet</div>';
+    return;
+  }
+  list.innerHTML = sessions.map(s => `
+    <div class="history-item ${s.id === currentSessionId ? 'active' : ''}" id="hist-${s.id}" onclick="loadSession(${s.id}, this)">
+      <span title="${escHtml(s.title)}">${escHtml(s.title)}</span>
+      <button class="del-btn" onclick="deleteSession(event, ${s.id})" title="Delete">✕</button>
+    </div>
+  `).join('');
+}
+
+async function loadSession(sessionId, el) {
+  const res = await apiFetch(`/api/chat/sessions/${sessionId}/messages`);
+  if (!res) return;
+  const messages = await res.json();
+
+  currentSessionId = sessionId;
+
+  // Update sidebar active state
+  document.querySelectorAll('.history-item').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+
+  // Update title
+  const titleEl = el.querySelector('span');
+  document.getElementById('chat-session-title').textContent = titleEl ? titleEl.textContent : 'Conversation';
+
+  // Render messages
+  const box = document.getElementById('chat-messages');
+  if (!messages.length) {
+    box.innerHTML = '<div class="msg msg-bot">👋 This conversation is empty. Send a message to start!</div>';
+    return;
+  }
+  box.innerHTML = messages.map(m =>
+    m.role === 'user'
+      ? `<div class="msg msg-user">${escHtml(m.content)}</div>`
+      : `<div class="msg msg-bot">${escHtml(m.content)}</div>`
+  ).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function deleteSession(e, sessionId) {
+  e.stopPropagation();
+  const res = await apiFetch(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
+  if (!res) return;
+  if (currentSessionId === sessionId) newChat();
+  await loadChatSessions();
+  toast('Conversation deleted', 'info');
 }
 
 async function sendChat() {
@@ -912,6 +1019,10 @@ async function sendChat() {
 
   const box = document.getElementById('chat-messages');
   input.value = '';
+
+  // Remove welcome message if first real message
+  const welcome = box.querySelector('.msg-bot');
+  if (welcome && box.children.length === 1) welcome.remove();
 
   // User bubble
   box.innerHTML += `<div class="msg msg-user">${escHtml(msg)}</div>`;
@@ -926,7 +1037,7 @@ async function sendChat() {
   try {
     const res = await apiFetch('/api/ai_coach', {
       method: 'POST',
-      body: JSON.stringify({ message: msg })
+      body: JSON.stringify({ message: msg, session_id: currentSessionId })
     });
 
     document.getElementById(typingId)?.remove();
@@ -938,6 +1049,12 @@ async function sendChat() {
       box.innerHTML += `<div class="msg msg-bot" style="color:var(--danger)">${escHtml(data.error)}</div>`;
     } else {
       box.innerHTML += `<div class="msg msg-bot">${escHtml(data.reply)}</div>`;
+      // Update session id if this was a new chat
+      if (!currentSessionId && data.session_id) {
+        currentSessionId = data.session_id;
+        document.getElementById('chat-session-title').textContent = msg.slice(0, 60);
+        await loadChatSessions();
+      }
     }
   } catch (err) {
     document.getElementById(typingId)?.remove();
