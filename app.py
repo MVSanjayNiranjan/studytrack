@@ -4,6 +4,7 @@ import smtplib
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 
+import httpx
 import psycopg2
 import bcrypt
 from groq import Groq
@@ -38,56 +39,73 @@ def is_valid_email(email):
     return "@" in email and "." in email.rsplit("@", 1)[-1]
 
 
-def send_verification_email(to_email, username, code):
+def send_email(to_email, subject, body):
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    from_email = os.getenv("FROM_EMAIL")
+
+    if resend_api_key and from_email:
+        response = httpx.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {resend_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": from_email,
+                "to": [to_email],
+                "subject": subject,
+                "text": body,
+            },
+            timeout=20.0,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(f"Resend error: {response.text}")
+        return
+
     smtp_email = os.getenv("SMTP_EMAIL")
     smtp_app_password = os.getenv("SMTP_APP_PASSWORD")
 
     if not smtp_email or not smtp_app_password:
         raise RuntimeError(
-            "Email sending is not configured. Add SMTP_EMAIL and SMTP_APP_PASSWORD in Railway environment variables."
+            "Email sending is not configured. Add RESEND_API_KEY and FROM_EMAIL in Railway, or use SMTP_EMAIL and SMTP_APP_PASSWORD."
         )
 
     msg = EmailMessage()
-    msg["Subject"] = "StudyTrack verification code"
+    msg["Subject"] = subject
     msg["From"] = smtp_email
     msg["To"] = to_email
-    msg.set_content(
-        f"Hi {username},\n\n"
-        f"Your StudyTrack verification code is: {code}\n\n"
-        "It expires in 10 minutes.\n\n"
-        "If you did not create this account, you can ignore this email."
-    )
+    msg.set_content(body)
 
     with smtplib.SMTP("smtp.gmail.com", 587) as server:
         server.starttls()
         server.login(smtp_email, smtp_app_password)
         server.send_message(msg)
+
+
+def send_verification_email(to_email, username, code):
+    send_email(
+        to_email,
+        "StudyTrack verification code",
+        (
+            f"Hi {username},\n\n"
+            f"Your StudyTrack verification code is: {code}\n\n"
+            "It expires in 10 minutes.\n\n"
+            "If you did not create this account, you can ignore this email."
+        ),
+    )
 
 
 def send_password_reset_email(to_email, username, code):
-    smtp_email = os.getenv("SMTP_EMAIL")
-    smtp_app_password = os.getenv("SMTP_APP_PASSWORD")
-
-    if not smtp_email or not smtp_app_password:
-        raise RuntimeError(
-            "Email sending is not configured. Add SMTP_EMAIL and SMTP_APP_PASSWORD in Railway environment variables."
-        )
-
-    msg = EmailMessage()
-    msg["Subject"] = "StudyTrack password reset code"
-    msg["From"] = smtp_email
-    msg["To"] = to_email
-    msg.set_content(
-        f"Hi {username},\n\n"
-        f"Your StudyTrack password reset code is: {code}\n\n"
-        "It expires in 10 minutes.\n\n"
-        "If you did not request a password reset, you can ignore this email."
+    send_email(
+        to_email,
+        "StudyTrack password reset code",
+        (
+            f"Hi {username},\n\n"
+            f"Your StudyTrack password reset code is: {code}\n\n"
+            "It expires in 10 minutes.\n\n"
+            "If you did not request a password reset, you can ignore this email."
+        ),
     )
-
-    with smtplib.SMTP("smtp.gmail.com", 587) as server:
-        server.starttls()
-        server.login(smtp_email, smtp_app_password)
-        server.send_message(msg)
 
 
 def ensure_user_email_verification_columns():
