@@ -1,4 +1,9 @@
 import os
+import random
+import smtplib
+from datetime import datetime, timedelta
+from email.message import EmailMessage
+
 import psycopg2
 import bcrypt
 from groq import Groq
@@ -25,6 +30,59 @@ def get_db():
     return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 
+def generate_verification_code():
+    return f"{random.randint(100000, 999999)}"
+
+
+def is_valid_email(email):
+    return "@" in email and "." in email.rsplit("@", 1)[-1]
+
+
+def send_verification_email(to_email, username, code):
+    smtp_email = os.getenv("SMTP_EMAIL")
+    smtp_app_password = os.getenv("SMTP_APP_PASSWORD")
+
+    if not smtp_email or not smtp_app_password:
+        raise RuntimeError(
+            "Email sending is not configured. Add SMTP_EMAIL and SMTP_APP_PASSWORD in Railway environment variables."
+        )
+
+    msg = EmailMessage()
+    msg["Subject"] = "StudyTrack verification code"
+    msg["From"] = smtp_email
+    msg["To"] = to_email
+    msg.set_content(
+        f"Hi {username},\n\n"
+        f"Your StudyTrack verification code is: {code}\n\n"
+        "It expires in 10 minutes.\n\n"
+        "If you did not create this account, you can ignore this email."
+    )
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.starttls()
+        server.login(smtp_email, smtp_app_password)
+        server.send_message(msg)
+
+
+def ensure_user_email_verification_columns():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_code TEXT")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_expires_at TIMESTAMPTZ")
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx "
+        "ON users (email) WHERE email IS NOT NULL"
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+ensure_user_email_verification_columns()
+
+
 # ─────────────────────────────────────────────
 # Serve frontend
 # ─────────────────────────────────────────────
@@ -35,32 +93,170 @@ def index():
 
 # ─────────────────────────────────────────────
 # POST /api/register
-# Body: { "username": "...", "password": "..." }
+# Body: { "username": "...", "email": "...", "password": "..." }
 # ─────────────────────────────────────────────
 @app.route("/api/register", methods=["POST"])
 def register():
     data = request.get_json()
     username = data.get("username", "").strip()
+    email = data.get("email", "").strip().lower()
     password = data.get("password", "")
 
-    if not username or not password:
-        return jsonify({"error": "Username and password required"}), 400
+    if not username or not email or not password:
+        return jsonify({"error": "Username, email, and password required"}), 400
+
+    if not is_valid_email(email):
+        return jsonify({"error": "Enter a valid email address"}), 400
 
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    verification_code = generate_verification_code()
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("SELECT 1 FROM users WHERE username = %s", (username,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Username already taken"}), 409
+
+        cur.execute("SELECT 1 FROM users WHERE email = %s", (email,))
+        if cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Email already registered"}), 409
+
+        cur.execute(
+            "INSERT INTO users (username, email, password_hash, is_verified, verification_code, verification_expires_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (username, email, hashed, False, verification_code, expires_at)
+        )
+
+        send_verification_email(email, username, verification_code)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Account created. Check your email for the verification code."}), 201
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# POST /api/resend-verification
+# Body: { "username": "...", "email": "..." }
+# ─────────────────────────────────────────────
+@app.route("/api/resend-verification", methods=["POST"])
+def resend_verification():
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip().lower()
+
+    if not username or not email:
+        return jsonify({"error": "Username and email required"}), 400
+
+    code = generate_verification_code()
+    expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, COALESCE(is_verified, TRUE) FROM users WHERE username = %s AND email = %s",
+            (username, email)
+        )
+        row = cur.fetchone()
+
+        if row is None:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Account not found"}), 404
+
+        if row[1]:
+            cur.close()
+            conn.close()
+            return jsonify({"message": "Email is already verified. Please log in."}), 200
+
+        cur.execute(
+            "UPDATE users SET verification_code = %s, verification_expires_at = %s WHERE id = %s",
+            (code, expires_at, row[0])
+        )
+
+        send_verification_email(email, username, code)
+
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "A new verification code has been sent."}), 200
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# POST /api/verify-email
+# Body: { "username": "...", "email": "...", "code": "123456" }
+# ─────────────────────────────────────────────
+@app.route("/api/verify-email", methods=["POST"])
+def verify_email():
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip().lower()
+    code = data.get("code", "").strip()
+
+    if not username or not email or not code:
+        return jsonify({"error": "Username, email, and verification code required"}), 400
 
     try:
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
-            "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
-            (username, hashed)
+            "SELECT id, verification_code, verification_expires_at, COALESCE(is_verified, TRUE) "
+            "FROM users WHERE username = %s AND email = %s",
+            (username, email)
+        )
+        row = cur.fetchone()
+
+        if row is None:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Account not found"}), 404
+
+        user_id, stored_code, expires_at, is_verified = row
+
+        if is_verified:
+            cur.close()
+            conn.close()
+            return jsonify({"message": "Email already verified. Please log in."}), 200
+
+        if stored_code != code:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid verification code"}), 400
+
+        now = datetime.now(expires_at.tzinfo) if expires_at and getattr(expires_at, "tzinfo", None) else datetime.utcnow()
+        if expires_at is None or expires_at < now:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Verification code expired. Request a new one."}), 400
+
+        cur.execute(
+            "UPDATE users SET is_verified = TRUE, verification_code = NULL, verification_expires_at = NULL WHERE id = %s",
+            (user_id,)
         )
         conn.commit()
         cur.close()
         conn.close()
-        return jsonify({"message": "User created"}), 201
-    except psycopg2.errors.UniqueViolation:
-        return jsonify({"error": "Username already taken"}), 409
+        return jsonify({"message": "Email verified. You can now log in."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -83,7 +279,7 @@ def login():
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
-            "SELECT id, password_hash FROM users WHERE username = %s",
+            "SELECT id, password_hash, COALESCE(is_verified, TRUE) FROM users WHERE username = %s",
             (username,)
         )
         row = cur.fetchone()
@@ -93,9 +289,12 @@ def login():
         if row is None:
             return jsonify({"error": "Invalid credentials"}), 401
 
-        user_id, stored_hash = row
+        user_id, stored_hash, is_verified = row
         if not bcrypt.checkpw(password.encode(), stored_hash.encode()):
             return jsonify({"error": "Invalid credentials"}), 401
+
+        if not is_verified:
+            return jsonify({"error": "Please verify your email before logging in."}), 403
 
         token = create_access_token(identity=str(user_id))
         return jsonify({"token": token, "username": username}), 200
@@ -322,217 +521,43 @@ def update_task(task_id):
 
 
 # ─────────────────────────────────────────────
-# Ensure chat tables exist
-# ─────────────────────────────────────────────
-def ensure_chat_tables():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS chat_sessions (
-            id SERIAL PRIMARY KEY,
-            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            title TEXT NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS chat_messages (
-            id SERIAL PRIMARY KEY,
-            session_id INTEGER NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
-            role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-            content TEXT NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
-
-try:
-    ensure_chat_tables()
-except Exception:
-    pass
-
-
-# ─────────────────────────────────────────────
-# GET  /api/chat/sessions          → list sessions for user
-# POST /api/chat/sessions          → create new session
-# ─────────────────────────────────────────────
-@app.route("/api/chat/sessions", methods=["GET", "POST"])
-@jwt_required()
-def chat_sessions():
-    user_id = int(get_jwt_identity())
-
-    if request.method == "GET":
-        try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT id, title, created_at FROM chat_sessions "
-                "WHERE user_id = %s ORDER BY created_at DESC",
-                (user_id,)
-            )
-            rows = cur.fetchall()
-            cur.close()
-            conn.close()
-            return jsonify([
-                {"id": r[0], "title": r[1], "created_at": str(r[2])}
-                for r in rows
-            ]), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    if request.method == "POST":
-        data = request.get_json()
-        title = data.get("title", "New Chat").strip() or "New Chat"
-        try:
-            conn = get_db()
-            cur = conn.cursor()
-            cur.execute(
-                "INSERT INTO chat_sessions (user_id, title) VALUES (%s, %s) RETURNING id, created_at",
-                (user_id, title)
-            )
-            row = cur.fetchone()
-            conn.commit()
-            cur.close()
-            conn.close()
-            return jsonify({"id": row[0], "title": title, "created_at": str(row[1])}), 201
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-
-# ─────────────────────────────────────────────
-# GET    /api/chat/sessions/<id>/messages  → load messages
-# DELETE /api/chat/sessions/<id>           → delete session
-# ─────────────────────────────────────────────
-@app.route("/api/chat/sessions/<int:session_id>", methods=["DELETE"])
-@jwt_required()
-def delete_chat_session(session_id):
-    user_id = int(get_jwt_identity())
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            "DELETE FROM chat_sessions WHERE id = %s AND user_id = %s",
-            (session_id, user_id)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-        return jsonify({"message": "Session deleted"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/chat/sessions/<int:session_id>/messages", methods=["GET"])
-@jwt_required()
-def chat_session_messages(session_id):
-    user_id = int(get_jwt_identity())
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        # Verify ownership
-        cur.execute(
-            "SELECT id FROM chat_sessions WHERE id = %s AND user_id = %s",
-            (session_id, user_id)
-        )
-        if not cur.fetchone():
-            cur.close()
-            conn.close()
-            return jsonify({"error": "Not found"}), 404
-        cur.execute(
-            "SELECT role, content FROM chat_messages "
-            "WHERE session_id = %s ORDER BY created_at ASC",
-            (session_id,)
-        )
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        return jsonify([{"role": r[0], "content": r[1]} for r in rows]), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# ─────────────────────────────────────────────
 # POST /api/ai_coach
-# Body: { "message": "...", "session_id": 123 (optional) }
-# Returns: { "reply": "...", "session_id": 123 }
+# Body: { "message": "How should I study for my Math exam?" }
+# Returns: { "reply": "..." }
 # ─────────────────────────────────────────────
 @app.route("/api/ai_coach", methods=["POST"])
 @jwt_required()
 def ai_coach():
-    user_id = int(get_jwt_identity())
     data = request.get_json()
     user_message = data.get("message", "").strip()
-    session_id = data.get("session_id")
 
     if not user_message:
         return jsonify({"error": "message required"}), 400
 
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return jsonify({"reply": "AI coach is not configured yet. Add your GROQ_API_KEY in Railway environment variables.", "session_id": session_id}), 200
+        return jsonify({"reply": "AI coach is not configured yet. Add your GROQ_API_KEY in Render environment variables."}), 200
 
     try:
-        conn = get_db()
-        cur = conn.cursor()
-
-        # Create session if none provided
-        if not session_id:
-            title = user_message[:60]
-            cur.execute(
-                "INSERT INTO chat_sessions (user_id, title) VALUES (%s, %s) RETURNING id",
-                (user_id, title)
-            )
-            session_id = cur.fetchone()[0]
-            conn.commit()
-
-        # Fetch conversation history for context
-        cur.execute(
-            "SELECT role, content FROM chat_messages "
-            "WHERE session_id = %s ORDER BY created_at ASC",
-            (session_id,)
-        )
-        history = [{"role": r[0], "content": r[1]} for r in cur.fetchall()]
-
-        # Save user message
-        cur.execute(
-            "INSERT INTO chat_messages (session_id, role, content) VALUES (%s, 'user', %s)",
-            (session_id, user_message)
-        )
-        conn.commit()
-
-        # Build messages for API
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are StudyCoach, a friendly AI assistant for students. "
-                    "Give concise, practical study advice. "
-                    "Focus on study techniques, time management, and motivation. "
-                    "Keep responses under 150 words."
-                )
-            }
-        ] + history + [{"role": "user", "content": user_message}]
-
         client = Groq(api_key=api_key)
         chat = client.chat.completions.create(
             model="llama-3.1-8b-instant",
             max_tokens=512,
-            messages=messages
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are StudyCoach, a friendly AI assistant for students. "
+                        "Give concise, practical study advice. "
+                        "Focus on study techniques, time management, and motivation. "
+                        "Keep responses under 150 words."
+                    )
+                },
+                {"role": "user", "content": user_message}
+            ]
         )
         reply = chat.choices[0].message.content
-
-        # Save assistant reply
-        cur.execute(
-            "INSERT INTO chat_messages (session_id, role, content) VALUES (%s, 'assistant', %s)",
-            (session_id, reply)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        return jsonify({"reply": reply, "session_id": session_id}), 200
+        return jsonify({"reply": reply}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -146,22 +146,7 @@
   .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   /* ── AI COACH ── */
-  .ai-coach-layout { display: flex; gap: 16px; align-items: flex-start; }
-  .chat-history-sidebar { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
-  .chat-history-sidebar h3 { font-size: 0.78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
-  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 460px; overflow-y: auto; }
-  .history-list::-webkit-scrollbar { width: 3px; }
-  .history-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-  .history-item { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--surface2); border: 1px solid transparent; cursor: pointer; font-size: 0.8rem; color: var(--muted); transition: all .2s; }
-  .history-item:hover { border-color: var(--border); color: var(--text); }
-  .history-item.active { border-color: var(--accent); color: var(--accent); background: rgba(124,106,247,.1); }
-  .history-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .history-item .del-btn { opacity: 0; font-size: 0.7rem; color: var(--danger); padding: 2px 5px; border-radius: 4px; border: none; background: none; cursor: pointer; transition: opacity .2s; }
-  .history-item:hover .del-btn { opacity: 1; }
-  .chat-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .chat-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .chat-toolbar .chat-session-title { font-size: 0.85rem; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-  .chat-wrap { display: flex; flex-direction: column; height: 420px; }
+  .chat-wrap { display: flex; flex-direction: column; height: 480px; }
   .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 14px; }
   .chat-messages::-webkit-scrollbar { width: 4px; }
   .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -175,28 +160,6 @@
   .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
   .quick-prompt { padding: 6px 14px; border-radius: 99px; font-size: 0.78rem; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; transition: all .2s; }
   .quick-prompt:hover { border-color: var(--accent); color: var(--accent); }
-  @media (max-width: 600px) { .ai-coach-layout { flex-direction: column; } .chat-history-sidebar { width: 100%; } .history-list { max-height: 160px; } }
-
-  /* ── HISTORY MODAL ── */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn .2s ease; }
-  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-  .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 560px; max-height: 80vh; display: flex; flex-direction: column; }
-  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); }
-  .modal-header h2 { font-size: 1rem; font-weight: 700; }
-  .modal-close { background: none; border: none; color: var(--muted); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 4px 8px; border-radius: 6px; transition: color .2s; }
-  .modal-close:hover { color: var(--text); }
-  .modal-search { padding: 12px 20px; border-bottom: 1px solid var(--border); }
-  .modal-search input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; color: var(--text); font-size: 0.9rem; outline: none; }
-  .modal-search input:focus { border-color: var(--accent); }
-  .modal-body { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; }
-  .modal-body::-webkit-scrollbar { width: 4px; }
-  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-  .modal-hist-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface2); border: 1px solid transparent; cursor: pointer; transition: all .2s; }
-  .modal-hist-item:hover { border-color: var(--accent); }
-  .modal-hist-item .mhi-title { flex: 1; font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .modal-hist-item .mhi-date { font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
-  .modal-hist-item .mhi-del { font-size: 0.75rem; color: var(--danger); background: none; border: none; cursor: pointer; opacity: 0; padding: 4px 6px; border-radius: 4px; transition: opacity .2s; }
-  .modal-hist-item:hover .mhi-del { opacity: 1; }
 
   /* ── CHARTS ── */
   .chart-container { position: relative; height: 260px; }
@@ -219,22 +182,6 @@
 
 <div id="toast-container"></div>
 
-<!-- ── HISTORY MODAL ── -->
-<div id="history-modal" style="display:none" class="modal-overlay" onclick="closeHistoryModal(event)">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h2>All Conversations</h2>
-      <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
-    </div>
-    <div class="modal-search">
-      <input type="text" id="history-search" placeholder="Search conversations…" oninput="filterHistoryModal()" />
-    </div>
-    <div class="modal-body" id="history-modal-list">
-      <div class="empty"><div class="empty-icon">💬</div><p>No conversations yet</p></div>
-    </div>
-  </div>
-</div>
-
 <!-- ═══════════════════════════════════════
      AUTH SCREEN
 ════════════════════════════════════════ -->
@@ -253,9 +200,21 @@
         <label>Username</label>
         <input type="text" id="auth-username" placeholder="Enter username" autocomplete="username" required />
       </div>
-      <div class="field">
+      <div class="field" id="email-field" style="display:none">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="Enter email" autocomplete="email" />
+      </div>
+      <div class="field" id="password-field">
         <label>Password</label>
         <input type="password" id="auth-password" placeholder="Enter password" autocomplete="current-password" required />
+      </div>
+      <div class="field" id="code-field" style="display:none">
+        <label>Verification Code</label>
+        <input type="text" id="auth-code" placeholder="Enter 6-digit code" inputmode="numeric" maxlength="6" />
+      </div>
+      <div id="auth-help" style="display:none;font-size:0.82rem;color:var(--muted);margin-bottom:14px"></div>
+      <div id="verify-actions" style="display:none;margin-bottom:14px">
+        <button class="btn btn-outline btn-sm" type="button" onclick="resendVerification()">Resend Code</button>
       </div>
       <button class="btn btn-primary" id="auth-btn" type="submit">Login</button>
     </form>
@@ -436,40 +395,23 @@
     <div class="tab-panel" id="tab-ai">
       <div class="section-title">AI Study Coach</div>
       <div class="card">
-        <div class="ai-coach-layout">
-          <!-- Sidebar -->
-          <div class="chat-history-sidebar">
-            <button class="btn btn-primary btn-sm" style="width:100%;margin-bottom:8px" onclick="newChat()">+ New Chat</button>
-            <h3>History</h3>
-            <div class="history-list" id="history-list">
-              <div style="font-size:0.78rem;color:var(--muted);padding:8px 4px">No conversations yet</div>
+        <div class="quick-prompts">
+          <span style="font-size:0.78rem;color:var(--muted);align-self:center">Quick ask:</span>
+          <button class="quick-prompt" onclick="quickPrompt(this)">How to focus better?</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">Best revision techniques?</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">How to reduce exam stress?</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">Create a study schedule</button>
+          <button class="quick-prompt" onclick="quickPrompt(this)">Pomodoro tips?</button>
+        </div>
+        <div class="chat-wrap">
+          <div class="chat-messages" id="chat-messages">
+            <div class="msg msg-bot">
+              👋 Hi! I'm your AI Study Coach. Ask me anything about studying, focus, time management, or exam prep!
             </div>
-            <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px;font-size:0.78rem" onclick="openHistoryModal()">📋 View All History</button>
           </div>
-          <!-- Main chat -->
-          <div class="chat-main">
-            <div class="quick-prompts">
-              <span style="font-size:0.78rem;color:var(--muted);align-self:center">Quick ask:</span>
-              <button class="quick-prompt" onclick="quickPrompt(this)">How to focus better?</button>
-              <button class="quick-prompt" onclick="quickPrompt(this)">Best revision techniques?</button>
-              <button class="quick-prompt" onclick="quickPrompt(this)">How to reduce exam stress?</button>
-              <button class="quick-prompt" onclick="quickPrompt(this)">Create a study schedule</button>
-              <button class="quick-prompt" onclick="quickPrompt(this)">Pomodoro tips?</button>
-            </div>
-            <div class="chat-toolbar">
-              <div class="chat-session-title" id="chat-session-title">New Conversation</div>
-            </div>
-            <div class="chat-wrap">
-              <div class="chat-messages" id="chat-messages">
-                <div class="msg msg-bot">
-                  👋 Hi! I'm your AI Study Coach. Ask me anything about studying, focus, time management, or exam prep!
-                </div>
-              </div>
-              <div class="chat-input-row">
-                <input type="text" id="chat-input" placeholder="Ask your study coach..." onkeydown="if(event.key==='Enter')sendChat()" />
-                <button class="btn btn-primary" onclick="sendChat()" id="chat-send-btn">Send</button>
-              </div>
-            </div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Ask your study coach..." onkeydown="if(event.key==='Enter')sendChat()" />
+            <button class="btn btn-primary" onclick="sendChat()" id="chat-send-btn">Send</button>
           </div>
         </div>
       </div>
@@ -517,44 +459,98 @@ let authMode = 'login';
 
 function switchAuthTab(mode) {
   authMode = mode;
-  document.querySelectorAll('.auth-tab').forEach((t,i) => {
-    t.classList.toggle('active', (i===0 && mode==='login') || (i===1 && mode==='register'));
+  document.querySelectorAll('.auth-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && mode === 'login') || (i === 1 && (mode === 'register' || mode === 'verify')));
   });
-  document.getElementById('auth-btn').textContent = mode === 'login' ? 'Login' : 'Create Account';
-  document.getElementById('auth-password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+
+  document.getElementById('email-field').style.display = mode === 'login' ? 'none' : 'block';
+  document.getElementById('password-field').style.display = mode === 'verify' ? 'none' : 'block';
+  document.getElementById('code-field').style.display = mode === 'verify' ? 'block' : 'none';
+  document.getElementById('verify-actions').style.display = mode === 'verify' ? 'block' : 'none';
+
+  const help = document.getElementById('auth-help');
+  const btn = document.getElementById('auth-btn');
+
+  if (mode === 'login') {
+    btn.textContent = 'Login';
+    help.style.display = 'none';
+    document.getElementById('auth-password').autocomplete = 'current-password';
+  } else if (mode === 'register') {
+    btn.textContent = 'Create Account';
+    help.style.display = 'block';
+    help.textContent = 'We’ll send a 6-digit verification code to your email after sign-up.';
+    document.getElementById('auth-password').autocomplete = 'new-password';
+  } else {
+    btn.textContent = 'Verify Email';
+    help.style.display = 'block';
+    help.textContent = 'Enter the verification code from your inbox to activate your account.';
+  }
 }
 
 async function handleAuth(e) {
   e.preventDefault();
   const username = document.getElementById('auth-username').value.trim();
+  const email = document.getElementById('auth-email').value.trim();
   const password = document.getElementById('auth-password').value;
+  const code = document.getElementById('auth-code').value.trim();
   const btn = document.getElementById('auth-btn');
+
+  let endpoint = '/api/login';
+  let payload = { username, password };
+
+  if (authMode === 'register') {
+    if (!username || !email || !password) {
+      toast('Username, email, and password are required.', 'error');
+      return;
+    }
+    endpoint = '/api/register';
+    payload = { username, email, password };
+  } else if (authMode === 'verify') {
+    if (!username || !email || !code) {
+      toast('Username, email, and verification code are required.', 'error');
+      return;
+    }
+    endpoint = '/api/verify-email';
+    payload = { username, email, code };
+  } else if (!username || !password) {
+    toast('Username and password are required.', 'error');
+    return;
+  }
 
   btn.disabled = true;
   btn.innerHTML = '<div class="spinner"></div>';
-
-  const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
 
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
     if (!res.ok) {
+      if (authMode === 'login' && (data.error || '').toLowerCase().includes('verify your email')) {
+        switchAuthTab('verify');
+      }
       toast(data.error || 'Something went wrong', 'error');
       return;
     }
 
     if (authMode === 'register') {
-      toast('Account created! Please log in.', 'success');
+      toast(data.message || 'Account created. Check your email for the verification code.', 'success');
+      document.getElementById('auth-password').value = '';
+      document.getElementById('auth-code').value = '';
+      switchAuthTab('verify');
+      return;
+    }
+
+    if (authMode === 'verify') {
+      toast(data.message || 'Email verified. You can now log in.', 'success');
+      document.getElementById('auth-code').value = '';
       switchAuthTab('login');
       return;
     }
 
-    // Login success
     localStorage.setItem('st_token', data.token);
     localStorage.setItem('st_username', data.username);
     token = data.token;
@@ -564,7 +560,35 @@ async function handleAuth(e) {
     toast('Cannot reach server. Is Flask running?', 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = authMode === 'login' ? 'Login' : 'Create Account';
+    btn.textContent = authMode === 'login' ? 'Login' : authMode === 'register' ? 'Create Account' : 'Verify Email';
+  }
+}
+
+async function resendVerification() {
+  const username = document.getElementById('auth-username').value.trim();
+  const email = document.getElementById('auth-email').value.trim();
+
+  if (!username || !email) {
+    toast('Enter your username and email first.', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/resend-verification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast(data.error || 'Could not resend the code.', 'error');
+      return;
+    }
+
+    toast(data.message || 'A new verification code has been sent.', 'success');
+  } catch (err) {
+    toast('Could not resend the code right now.', 'error');
   }
 }
 
@@ -572,8 +596,6 @@ function logout() {
   localStorage.removeItem('st_token');
   localStorage.removeItem('st_username');
   token = null;
-  newChat();
-  document.getElementById('history-list').innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:8px 4px">No conversations yet</div>';
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
   toast('Logged out', 'info');
@@ -601,8 +623,6 @@ function startApp(uname) {
   // Set today's date in attendance form
   document.getElementById('att-date').value = today();
   loadDashboard();
-  loadChatSessions();
-  newChat();
 }
 
 function today() {
@@ -622,7 +642,6 @@ function switchTab(name) {
   if (name === 'attendance') loadAttendance();
   if (name === 'tasks')      loadTasks();
   if (name === 'charts')     loadCharts();
-  if (name === 'ai')         loadChatSessions();
 }
 
 // ═══════════════════════════════════════════════
@@ -975,84 +994,9 @@ async function loadCharts() {
 // ═══════════════════════════════════════════════
 // AI COACH
 // ═══════════════════════════════════════════════
-let currentSessionId = null;
-
 function quickPrompt(btn) {
   document.getElementById('chat-input').value = btn.textContent;
   sendChat();
-}
-
-function newChat() {
-  currentSessionId = null;
-  document.getElementById('chat-session-title').textContent = 'New Conversation';
-  document.getElementById('chat-messages').innerHTML = `
-    <div class="msg msg-bot">👋 Hi! I'm your AI Study Coach. Ask me anything about studying, focus, time management, or exam prep!</div>
-  `;
-  document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
-}
-
-async function loadChatSessions() {
-  const res = await apiFetch('/api/chat/sessions');
-  if (!res) return;
-  const sessions = await res.json();
-  allSessionsCache = sessions;
-  renderHistorySidebar(sessions);
-  // Refresh modal list if modal is open
-  if (document.getElementById('history-modal').style.display !== 'none') {
-    filterHistoryModal();
-  }
-}
-
-function renderHistorySidebar(sessions) {
-  const list = document.getElementById('history-list');
-  if (!sessions.length) {
-    list.innerHTML = '<div style="font-size:0.78rem;color:var(--muted);padding:8px 4px">No conversations yet</div>';
-    return;
-  }
-  list.innerHTML = sessions.map(s => `
-    <div class="history-item ${s.id === currentSessionId ? 'active' : ''}" id="hist-${s.id}" onclick="loadSession(${s.id}, this)">
-      <span title="${escHtml(s.title)}">${escHtml(s.title)}</span>
-      <button class="del-btn" onclick="deleteSession(event, ${s.id})" title="Delete">✕</button>
-    </div>
-  `).join('');
-}
-
-async function loadSession(sessionId, el) {
-  const res = await apiFetch(`/api/chat/sessions/${sessionId}/messages`);
-  if (!res) return;
-  const messages = await res.json();
-
-  currentSessionId = sessionId;
-
-  // Update sidebar active state
-  document.querySelectorAll('.history-item').forEach(e => e.classList.remove('active'));
-  el.classList.add('active');
-
-  // Update title
-  const titleEl = el.querySelector('span');
-  document.getElementById('chat-session-title').textContent = titleEl ? titleEl.textContent : 'Conversation';
-
-  // Render messages
-  const box = document.getElementById('chat-messages');
-  if (!messages.length) {
-    box.innerHTML = '<div class="msg msg-bot">👋 This conversation is empty. Send a message to start!</div>';
-    return;
-  }
-  box.innerHTML = messages.map(m =>
-    m.role === 'user'
-      ? `<div class="msg msg-user">${escHtml(m.content)}</div>`
-      : `<div class="msg msg-bot">${escHtml(m.content)}</div>`
-  ).join('');
-  box.scrollTop = box.scrollHeight;
-}
-
-async function deleteSession(e, sessionId) {
-  e.stopPropagation();
-  const res = await apiFetch(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
-  if (!res) return;
-  if (currentSessionId === sessionId) newChat();
-  await loadChatSessions();
-  toast('Conversation deleted', 'info');
 }
 
 async function sendChat() {
@@ -1062,10 +1006,6 @@ async function sendChat() {
 
   const box = document.getElementById('chat-messages');
   input.value = '';
-
-  // Remove welcome message if first real message
-  const welcome = box.querySelector('.msg-bot');
-  if (welcome && box.children.length === 1) welcome.remove();
 
   // User bubble
   box.innerHTML += `<div class="msg msg-user">${escHtml(msg)}</div>`;
@@ -1080,7 +1020,7 @@ async function sendChat() {
   try {
     const res = await apiFetch('/api/ai_coach', {
       method: 'POST',
-      body: JSON.stringify({ message: msg, session_id: currentSessionId })
+      body: JSON.stringify({ message: msg })
     });
 
     document.getElementById(typingId)?.remove();
@@ -1092,12 +1032,6 @@ async function sendChat() {
       box.innerHTML += `<div class="msg msg-bot" style="color:var(--danger)">${escHtml(data.error)}</div>`;
     } else {
       box.innerHTML += `<div class="msg msg-bot">${escHtml(data.reply)}</div>`;
-      // Update session id if this was a new chat
-      if (!currentSessionId && data.session_id) {
-        currentSessionId = data.session_id;
-        document.getElementById('chat-session-title').textContent = msg.slice(0, 60);
-        await loadChatSessions();
-      }
     }
   } catch (err) {
     document.getElementById(typingId)?.remove();
@@ -1106,75 +1040,6 @@ async function sendChat() {
     document.getElementById('chat-send-btn').disabled = false;
     box.scrollTop = box.scrollHeight;
   }
-}
-
-// ─────────────────────────────────────────────
-// HISTORY MODAL
-// ─────────────────────────────────────────────
-let allSessionsCache = [];
-
-function openHistoryModal() {
-  document.getElementById('history-modal').style.display = 'flex';
-  document.getElementById('history-search').value = '';
-  renderHistoryModal(allSessionsCache);
-  setTimeout(() => document.getElementById('history-search').focus(), 100);
-}
-
-function closeHistoryModal(e) {
-  if (e && e.target !== document.getElementById('history-modal')) return;
-  document.getElementById('history-modal').style.display = 'none';
-}
-
-function filterHistoryModal() {
-  const q = document.getElementById('history-search').value.toLowerCase();
-  const filtered = q ? allSessionsCache.filter(s => s.title.toLowerCase().includes(q)) : allSessionsCache;
-  renderHistoryModal(filtered);
-}
-
-function renderHistoryModal(sessions) {
-  const list = document.getElementById('history-modal-list');
-  if (!sessions.length) {
-    list.innerHTML = '<div class="empty"><div class="empty-icon">💬</div><p>No conversations found</p></div>';
-    return;
-  }
-  list.innerHTML = sessions.map(s => {
-    const date = new Date(s.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    return `
-      <div class="modal-hist-item" onclick="openSessionFromModal(${s.id}, this)">
-        <span class="mhi-title" title="${escHtml(s.title)}">${escHtml(s.title)}</span>
-        <span class="mhi-date">${date}</span>
-        <button class="mhi-del" onclick="deleteSessionFromModal(event, ${s.id})" title="Delete">✕</button>
-      </div>`;
-  }).join('');
-}
-
-async function openSessionFromModal(sessionId, el) {
-  const item = el.closest ? el.closest('.modal-hist-item') : el;
-  const titleEl = item.querySelector('.mhi-title');
-  // Find the sidebar item and simulate a click
-  const sidebarItem = document.getElementById(`hist-${sessionId}`);
-  if (sidebarItem) {
-    await loadSession(sessionId, sidebarItem);
-  } else {
-    await loadSession(sessionId, { classList: { add: ()=>{}, remove: ()=>{} }, querySelector: () => titleEl });
-    document.getElementById('chat-session-title').textContent = titleEl ? titleEl.textContent : 'Conversation';
-  }
-  document.getElementById('history-modal').style.display = 'none';
-  // Switch to AI tab if not already there
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-ai').classList.add('active');
-  document.querySelectorAll('.tab-btn').forEach(b => { if (b.textContent.trim() === 'AI Coach') b.classList.add('active'); });
-}
-
-async function deleteSessionFromModal(e, sessionId) {
-  e.stopPropagation();
-  const res = await apiFetch(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' });
-  if (!res) return;
-  if (currentSessionId === sessionId) newChat();
-  await loadChatSessions();
-  renderHistoryModal(allSessionsCache);
-  toast('Conversation deleted', 'info');
 }
 
 // ═══════════════════════════════════════════════
@@ -1193,9 +1058,6 @@ if (token) {
   startApp(username || 'Student');
 }
 updatePomoDisplay();
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.getElementById('history-modal').style.display = 'none';
-});
 </script>
 </body>
 </html>
