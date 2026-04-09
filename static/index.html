@@ -22,8 +22,17 @@
     --radius: 12px;
     --radius-sm: 8px;
   }
+  [data-theme="light"] {
+    --bg: #f0f0f7;
+    --surface: #ffffff;
+    --surface2: #e6e6f2;
+    --border: #cacade;
+    --text: #1a1a2e;
+    --muted: #6b6b8a;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; transition: background-color .25s, color .15s; }
+  .navbar, .card, .stat-card, .modal-box, .auth-card, .task-item, .history-item, .msg-bot, .chat-messages { transition: background-color .25s, border-color .25s; }
 
   /* ── TOAST ── */
   #toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
@@ -138,7 +147,20 @@
   .task-check.checked { background: var(--success); border-color: var(--success); }
   .task-check.checked::after { content: '✓'; color: #fff; font-size: 0.75rem; font-weight: 700; }
   .task-title { flex: 1; font-size: 0.9rem; }
-  .task-subject { font-size: 0.75rem; color: var(--muted); background: var(--surface); border: 1px solid var(--border); padding: 2px 10px; border-radius: 99px; }
+  .task-subject { font-size: 0.75rem; background: var(--surface); border: 1px solid var(--border); padding: 2px 10px; border-radius: 99px; }
+  /* ── PRINT / PDF EXPORT ── */
+  @media print {
+    body { background:#fff !important; color:#000 !important; }
+    #auth-screen,.navbar,.tab-bar,#toast-container,#history-modal,.tab-panel { display:none !important; }
+    #print-export { display:block !important; }
+    #print-header { margin-bottom:20px; border-bottom:2px solid #000; padding-bottom:10px; }
+    #print-header h1 { font-size:1.5rem; } #print-header p { font-size:0.85rem; color:#555; margin-top:4px; }
+    #print-export h2 { font-size:1.05rem; margin:18px 0 6px; border-bottom:1px solid #ccc; padding-bottom:3px; }
+    #print-export table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+    #print-export th,#print-export td { border:1px solid #ccc; padding:5px 9px; text-align:left; }
+    #print-export th { background:#f0f0f0; font-weight:700; }
+    #print-export tr:nth-child(even) td { background:#fafafa; }
+  }
   .task-delete { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1rem; padding: 4px; border-radius: 6px; transition: all .2s; }
   .task-delete:hover { color: var(--danger); background: #450a0a55; }
   .tasks-filter { display: flex; gap: 8px; margin-bottom: 16px; }
@@ -279,6 +301,8 @@
     <div class="nav-brand">StudyTrack</div>
     <div class="nav-right">
       <div class="nav-user">Welcome, <span id="nav-username"></span></div>
+      <button class="btn btn-outline btn-sm" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+      <button class="btn btn-outline btn-sm" id="export-btn" onclick="exportToPDF()">&#128438; Export PDF</button>
       <button class="btn btn-outline btn-sm" onclick="logout()">Logout</button>
     </div>
   </nav>
@@ -297,11 +321,11 @@
     <!-- ── DASHBOARD ── -->
     <div class="tab-panel active" id="tab-dashboard">
       <div class="section-title">Overview</div>
-      <div class="grid-3" style="margin-bottom:24px">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin-bottom:24px">
         <div class="stat-card">
           <div class="stat-label">Study Hours (7d)</div>
           <div class="stat-value" id="stat-hours" style="color:var(--accent)">—</div>
-          <div class="stat-sub">Pomodoro sessions</div>
+          <div class="stat-sub">logged this week</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Attendance Rate</div>
@@ -312,6 +336,11 @@
           <div class="stat-label">Pending Tasks</div>
           <div class="stat-value" id="stat-tasks" style="color:var(--accent3)">—</div>
           <div class="stat-sub">tasks remaining</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Study Streak 🔥</div>
+          <div class="stat-value" id="stat-streak" style="color:var(--warning)">—</div>
+          <div class="stat-sub" id="stat-streak-sub">consecutive days</div>
         </div>
       </div>
       <div class="grid-2">
@@ -453,6 +482,14 @@
           <button class="quick-prompt" onclick="quickPrompt(this)">Create a study schedule</button>
           <button class="quick-prompt" onclick="quickPrompt(this)">Pomodoro tips?</button>
         </div>
+        <div style="margin-bottom:12px;padding:12px 14px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">My Notes for Coach</span>
+            <button class="btn btn-outline btn-sm" id="memory-save-btn" onclick="saveCoachMemory()" style="font-size:0.73rem;padding:4px 10px">Save</button>
+          </div>
+          <textarea id="coach-memory-input" placeholder="Tell the coach about yourself — e.g. studying A-levels, weak in Chemistry, prefer bullet summaries..." rows="2" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 12px;color:var(--text);font-size:0.82rem;outline:none;resize:vertical;font-family:inherit;min-height:54px;max-height:110px" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px'"></textarea>
+          <div style="font-size:0.7rem;color:var(--muted);margin-top:4px">Injected into every AI session automatically.</div>
+        </div>
         <div class="ai-coach-layout">
           <!-- Sidebar -->
           <div class="chat-sidebar">
@@ -485,6 +522,12 @@
     </div>
 
   </div><!-- /content -->
+  <!-- Print export — hidden normally, visible only when printing -->
+  <div id="print-export" style="display:none;padding:24px">
+    <div id="print-header"><h1>StudyTrack Report</h1><p id="print-meta"></p></div>
+    <div id="print-study-logs"></div>
+    <div id="print-attendance"></div>
+  </div>
 </div><!-- /app -->
 
 <!-- ── HISTORY MODAL ── -->
@@ -523,6 +566,20 @@ let pomodoroTotal   = 25 * 60;
 let pomodoroMode    = 'focus';
 let pomodoroSessionsToday = 0;
 let charts = {};
+let currentTheme = localStorage.getItem('st_theme') || 'dark';
+const SUBJECT_PALETTE = ['#7c6af7','#5eead4','#f97316','#22c55e','#ef4444','#f59e0b','#3b82f6','#ec4899','#a855f7','#06b6d4','#84cc16','#f43f5e'];
+let subjectColorMap = {};
+try { const sc = localStorage.getItem('st_subject_colors'); if (sc) subjectColorMap = JSON.parse(sc); } catch(e) {}
+
+function getSubjectColor(subject) {
+  if (!subject) return 'var(--muted)';
+  if (!subjectColorMap[subject]) {
+    const idx = Object.keys(subjectColorMap).length;
+    subjectColorMap[subject] = SUBJECT_PALETTE[idx % SUBJECT_PALETTE.length];
+    localStorage.setItem('st_subject_colors', JSON.stringify(subjectColorMap));
+  }
+  return subjectColorMap[subject];
+}
 
 // ═══════════════════════════════════════════════
 // TOAST
@@ -812,6 +869,8 @@ async function sendUsernameCode() {
 function logout() {
   localStorage.removeItem('st_token');
   localStorage.removeItem('st_username');
+  localStorage.removeItem('st_subject_colors');
+  subjectColorMap = {};
   token = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'flex';
@@ -839,8 +898,10 @@ function startApp(uname) {
   document.getElementById('nav-username').textContent = uname;
   // Set today's date in attendance form
   document.getElementById('att-date').value = today();
+  applyTheme(currentTheme);
   loadDashboard();
   loadChatSessions();
+  loadCoachMemory();
   newChat();
 }
 
@@ -867,11 +928,14 @@ function switchTab(name) {
 // DASHBOARD
 // ═══════════════════════════════════════════════
 async function loadDashboard() {
-  const [logs, att, tasks] = await Promise.all([
+  const [logs, att, tasks, streakData] = await Promise.all([
     apiFetch('/api/study_logs').then(r => r ? r.json() : []),
     apiFetch('/api/attendance').then(r => r ? r.json() : []),
-    apiFetch('/api/tasks').then(r => r ? r.json() : [])
+    apiFetch('/api/tasks').then(r => r ? r.json() : []),
+    apiFetch('/api/streak').then(r => r ? r.json() : {streak: 0, last_date: null})
   ]);
+  // Seed subject colors
+  [...logs.map(l => l.subject), ...tasks.map(t => t.subject), ...att.map(a => a.subject)].filter(Boolean).forEach(getSubjectColor);
 
   // Study hours last 7 days
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
@@ -889,6 +953,11 @@ async function loadDashboard() {
   const pending = tasks.filter(t => !t.completed).length;
   document.getElementById('stat-tasks').textContent = pending;
 
+  // Streak
+  const streak = streakData.streak || 0;
+  document.getElementById('stat-streak').textContent = streak + (streak === 1 ? ' day' : ' days');
+  document.getElementById('stat-streak-sub').textContent = streak > 0 ? 'Last: ' + (streakData.last_date || '') : 'Log study time to start!';
+
   // Recent tasks (last 4)
   const dashTasks = document.getElementById('dash-tasks');
   if (tasks.length === 0) {
@@ -898,7 +967,7 @@ async function loadDashboard() {
       <div class="task-item ${t.completed ? 'completed' : ''}" style="margin-bottom:6px">
         <div class="task-check ${t.completed ? 'checked' : ''}"></div>
         <div class="task-title">${escHtml(t.title)}</div>
-        <span class="task-subject">${escHtml(t.subject)}</span>
+        <span class="task-subject" style="color:${getSubjectColor(t.subject)};border-color:${getSubjectColor(t.subject)}55;background:${getSubjectColor(t.subject)}18">${escHtml(t.subject)}</span>
       </div>`).join('');
   }
 
@@ -911,7 +980,7 @@ async function loadDashboard() {
     dashAtt.innerHTML = recent.map(a => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
         <span style="font-size:0.85rem">${a.date}</span>
-        <span style="font-size:0.85rem;color:var(--muted)">${escHtml(a.subject)}</span>
+        <span style="font-size:0.85rem;color:${getSubjectColor(a.subject)}">${escHtml(a.subject)}</span>
         <span class="badge badge-${a.status.toLowerCase()}">${a.status}</span>
       </div>`).join('');
   }
@@ -933,10 +1002,11 @@ async function loadAttendance() {
     return;
   }
 
+  data.forEach(a => getSubjectColor(a.subject));
   tbody.innerHTML = data.map(a => `
     <tr>
       <td>${a.date}</td>
-      <td>${escHtml(a.subject)}</td>
+      <td style="color:${getSubjectColor(a.subject)};font-weight:500">${escHtml(a.subject)}</td>
       <td><span class="badge badge-${a.status.toLowerCase()}">${a.status}</span></td>
     </tr>`).join('');
 }
@@ -989,7 +1059,7 @@ function renderTasks() {
     <div class="task-item ${t.completed ? 'completed' : ''}" id="task-${t.id}">
       <div class="task-check ${t.completed ? 'checked' : ''}" onclick="toggleTask(${t.id},${!t.completed})"></div>
       <div class="task-title">${escHtml(t.title)}</div>
-      <span class="task-subject">${escHtml(t.subject)}</span>
+      <span class="task-subject" style="color:${getSubjectColor(t.subject)};border-color:${getSubjectColor(t.subject)}55;background:${getSubjectColor(t.subject)}18">${escHtml(t.subject)}</span>
       <button class="task-delete" onclick="deleteTask(${t.id})" title="Delete">🗑</button>
     </div>`).join('');
 }
@@ -1132,13 +1202,14 @@ async function loadCharts() {
   Object.values(charts).forEach(c => c.destroy());
   charts = {};
 
+  const isLight = currentTheme === 'light';
+  const gridCol = isLight ? '#cacade' : '#2e2e4a';
+  const tickCol = isLight ? '#6b6b8a' : '#6b6b8a';
   const defaults = {
-    color: '#e2e2f0',
-    borderColor: '#2e2e4a',
-    plugins: { legend: { labels: { color: '#6b6b8a', font: { size: 12 } } } },
+    plugins: { legend: { labels: { color: tickCol, font: { size: 12 } } } },
     scales: {
-      x: { ticks: { color: '#6b6b8a' }, grid: { color: '#2e2e4a' } },
-      y: { ticks: { color: '#6b6b8a' }, grid: { color: '#2e2e4a' } }
+      x: { ticks: { color: tickCol }, grid: { color: gridCol } },
+      y: { ticks: { color: tickCol }, grid: { color: gridCol } }
     }
   };
 
@@ -1183,7 +1254,7 @@ async function loadCharts() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { ...defaults.plugins, legend: { position: 'right', labels: { color: '#6b6b8a' } } },
+      plugins: { ...defaults.plugins, legend: { position: 'right', labels: { color: tickCol } } },
       cutout: '65%'
     }
   });
@@ -1192,7 +1263,7 @@ async function loadCharts() {
   const subjectMap = {};
   logs.forEach(l => { subjectMap[l.subject] = (subjectMap[l.subject] || 0) + l.duration_minutes / 60; });
   const subjects = Object.keys(subjectMap);
-  const palette  = ['#7c6af7','#5eead4','#f97316','#22c55e','#ef4444','#f59e0b','#3b82f6','#ec4899'];
+  subjects.forEach(s => getSubjectColor(s));
   charts.subject = new Chart(document.getElementById('chart-subject'), {
     type: 'bar',
     data: {
@@ -1200,8 +1271,8 @@ async function loadCharts() {
       datasets: [{
         label: 'Hours',
         data: subjects.length ? subjects.map(s => subjectMap[s].toFixed(1)) : [0],
-        backgroundColor: subjects.map((_, i) => palette[i % palette.length] + '55'),
-        borderColor:     subjects.map((_, i) => palette[i % palette.length]),
+        backgroundColor: subjects.map(s => getSubjectColor(s) + '55'),
+        borderColor:     subjects.map(s => getSubjectColor(s)),
         borderWidth: 2,
         borderRadius: 6
       }]
@@ -1428,8 +1499,77 @@ function escHtml(str) {
 }
 
 // ═══════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════
+function applyTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.setAttribute('data-theme', theme === 'light' ? 'light' : '');
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+  localStorage.setItem('st_theme', theme);
+}
+
+function toggleTheme() {
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+}
+
+// ═══════════════════════════════════════════════
+// COACH MEMORY
+// ═══════════════════════════════════════════════
+async function loadCoachMemory() {
+  const res = await apiFetch('/api/coach_memory');
+  if (!res) return;
+  const data = await res.json();
+  const el = document.getElementById('coach-memory-input');
+  if (el) el.value = data.memory || '';
+}
+
+async function saveCoachMemory() {
+  const el = document.getElementById('coach-memory-input');
+  if (!el) return;
+  const btn = document.getElementById('memory-save-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  const res = await apiFetch('/api/coach_memory', {
+    method: 'POST',
+    body: JSON.stringify({ memory: el.value.trim() })
+  });
+  btn.disabled = false;
+  btn.textContent = 'Save';
+  if (!res) return;
+  toast(res.ok ? 'Coach notes saved!' : 'Failed to save', res.ok ? 'success' : 'error');
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT PDF
+// ═══════════════════════════════════════════════
+async function exportToPDF() {
+  const btn = document.getElementById('export-btn');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  const [logs, att] = await Promise.all([
+    apiFetch('/api/study_logs').then(r => r ? r.json() : []),
+    apiFetch('/api/attendance').then(r => r ? r.json() : [])
+  ]);
+  document.getElementById('print-meta').textContent =
+    'Generated: ' + new Date().toLocaleString() + '  |  User: ' + (username || '');
+  document.getElementById('print-study-logs').innerHTML = `
+    <h2>Study Log</h2>
+    <table><thead><tr><th>Date</th><th>Subject</th><th>Duration (min)</th></tr></thead>
+    <tbody>${logs.map(l => `<tr><td>${l.date}</td><td>${escHtml(l.subject)}</td><td>${l.duration_minutes}</td></tr>`).join('')}</tbody></table>`;
+  document.getElementById('print-attendance').innerHTML = `
+    <h2>Attendance</h2>
+    <table><thead><tr><th>Date</th><th>Subject</th><th>Status</th></tr></thead>
+    <tbody>${att.map(a => `<tr><td>${a.date}</td><td>${escHtml(a.subject)}</td><td>${a.status}</td></tr>`).join('')}</tbody></table>`;
+  btn.disabled = false;
+  btn.textContent = '&#128438; Export PDF';
+  window.print();
+}
+
+// ═══════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════
+applyTheme(currentTheme);
 if (token) {
   startApp(username || 'Student');
 }

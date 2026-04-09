@@ -146,6 +146,21 @@ def ensure_user_email_verification_columns():
 ensure_user_email_verification_columns()
 
 
+def ensure_coach_memory_column():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS coach_memory TEXT DEFAULT ''")
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+try:
+    ensure_coach_memory_column()
+except Exception:
+    pass
+
+
 def ensure_chat_tables():
     conn = get_db()
     cur = conn.cursor()
@@ -712,6 +727,83 @@ def study_logs():
 
 
 # ─────────────────────────────────────────────
+# GET /api/streak
+# Returns: { "streak": int, "last_date": "YYYY-MM-DD"|null }
+# ─────────────────────────────────────────────
+@app.route("/api/streak", methods=["GET"])
+@jwt_required()
+def get_streak():
+    user_id = int(get_jwt_identity())
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT DISTINCT date FROM study_logs "
+            "WHERE user_id = %s ORDER BY date DESC",
+            (user_id,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        if not rows:
+            return jsonify({"streak": 0, "last_date": None}), 200
+
+        from datetime import date as date_type
+        dates = [r[0] if isinstance(r[0], date_type) else date_type.fromisoformat(str(r[0])) for r in rows]
+        today = date_type.today()
+        # Allow streak to continue if last log was today or yesterday
+        if dates[0] < today - timedelta(days=1):
+            return jsonify({"streak": 0, "last_date": str(dates[0])}), 200
+        streak = 0
+        expected = today
+        for d in dates:
+            if d == expected or (streak == 0 and d == today - timedelta(days=1)):
+                streak += 1
+                expected = d - timedelta(days=1)
+            else:
+                break
+        return jsonify({"streak": streak, "last_date": str(dates[0])}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# GET  /api/coach_memory  → { "memory": "..." }
+# POST /api/coach_memory  → save { "memory": "..." }
+# ─────────────────────────────────────────────
+@app.route("/api/coach_memory", methods=["GET", "POST"])
+@jwt_required()
+def coach_memory():
+    user_id = int(get_jwt_identity())
+    if request.method == "GET":
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("SELECT COALESCE(coach_memory,'') FROM users WHERE id = %s", (user_id,))
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
+            return jsonify({"memory": row[0] if row else ""}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+    data = request.get_json()
+    memory = data.get("memory", "")
+    if len(memory) > 2000:
+        return jsonify({"error": "Notes too long (max 2000 chars)"}), 400
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("UPDATE users SET coach_memory = %s WHERE id = %s", (memory, user_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Saved"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
 # GET   /api/tasks              → list tasks for the logged-in user
 # POST  /api/tasks              → create a new task
 # PATCH /api/tasks/<id>         → update a task (complete or delete)
@@ -954,6 +1046,11 @@ def ai_coach():
         )
         history = [{"role": r[0], "content": r[1]} for r in cur.fetchall()]
 
+        # Fetch user's personal coach notes
+        cur.execute("SELECT COALESCE(coach_memory,'') FROM users WHERE id = %s", (user_id,))
+        mem_row = cur.fetchone()
+        coach_mem = mem_row[0].strip() if mem_row and mem_row[0] else ""
+
         # Save the user message
         cur.execute(
             "INSERT INTO chat_messages (session_id, role, content) VALUES (%s, 'user', %s)",
@@ -972,6 +1069,8 @@ def ai_coach():
             "- Separate distinct sections with a blank line.\n"
             "Be clear, practical, and thorough. Do not cram everything into one paragraph."
         )
+        if coach_mem:
+            system_prompt += f"\n\nPersonal context about this student (always keep this in mind): {coach_mem}"
 
         client = Groq(api_key=api_key)
         chat = client.chat.completions.create(
