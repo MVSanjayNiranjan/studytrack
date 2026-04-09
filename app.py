@@ -803,16 +803,21 @@ def ai_coach():
     try:
         client = Groq(api_key=api_key)
         chat = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            max_tokens=512,
+            model="llama-3.3-70b-versatile",
+            max_tokens=1024,
             messages=[
                 {
                     "role": "system",
                     "content": (
-                        "You are StudyCoach, a friendly AI assistant for students. "
-                        "Give concise, practical study advice. "
-                        "Focus on study techniques, time management, and motivation. "
-                        "Keep responses under 150 words."
+                        "You are StudyCoach, a knowledgeable AI assistant for students. "
+                        "You can help with: study techniques, time management, exam prep, motivation, "
+                        "mathematics, science, coding and programming (any language), writing, and any academic subject. "
+                        "Format every response for readability:\n"
+                        "- Use numbered lists (1. 2. 3.) or bullet points (-) for multiple steps or tips, each on its own line.\n"
+                        "- Use **bold** for key terms or important points.\n"
+                        "- For code, wrap it in triple backticks with the language name.\n"
+                        "- Separate distinct sections with a blank line.\n"
+                        "Be clear, practical, and thorough. Do not cram everything into one paragraph."
                     )
                 },
                 {"role": "user", "content": user_message}

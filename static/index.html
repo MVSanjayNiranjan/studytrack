@@ -154,9 +154,11 @@
   .msg-user { background: var(--accent); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
   .msg-bot  { background: var(--surface); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
   .msg-bot.typing { color: var(--muted); font-style: italic; }
-  .chat-input-row { display: flex; gap: 10px; }
-  .chat-input-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; color: var(--text); font-size: 0.9rem; outline: none; }
-  .chat-input-row input:focus { border-color: var(--accent); }
+  .chat-input-row { display: flex; gap: 10px; align-items: flex-end; }
+  .chat-input-row textarea { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; color: var(--text); font-size: 0.9rem; outline: none; resize: none; min-height: 44px; max-height: 160px; overflow-y: auto; font-family: inherit; line-height: 1.5; display: block; }
+  .chat-input-row textarea:focus { border-color: var(--accent); }
+  .msg-bot code { background: var(--surface2); padding: 2px 6px; border-radius: 4px; font-size: 0.82em; font-family: monospace; }
+  .msg-bot pre { background: var(--surface2); padding: 10px 14px; border-radius: 8px; font-size: 0.82em; overflow-x: auto; margin: 6px 0; line-height: 1.5; }
   .quick-prompts { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
   .quick-prompt { padding: 6px 14px; border-radius: 99px; font-size: 0.78rem; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); cursor: pointer; transition: all .2s; }
   .quick-prompt:hover { border-color: var(--accent); color: var(--accent); }
@@ -423,7 +425,7 @@
             </div>
           </div>
           <div class="chat-input-row">
-            <input type="text" id="chat-input" placeholder="Ask your study coach..." onkeydown="if(event.key==='Enter')sendChat()" />
+            <textarea id="chat-input" placeholder="Ask your study coach..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}" oninput="autoResizeChat(this)"></textarea>
             <button class="btn btn-primary" onclick="sendChat()" id="chat-send-btn">Send</button>
           </div>
         </div>
@@ -1142,8 +1144,29 @@ async function loadCharts() {
 // AI COACH
 // ═══════════════════════════════════════════════
 function quickPrompt(btn) {
-  document.getElementById('chat-input').value = btn.textContent;
+  const input = document.getElementById('chat-input');
+  input.value = btn.textContent;
+  autoResizeChat(input);
   sendChat();
+}
+
+function autoResizeChat(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
+function formatReply(text) {
+  // Escape HTML first, then apply safe formatting
+  let s = escHtml(text);
+  // Bold: **text**
+  s = s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  // Inline code: `code`
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  // Fenced code blocks: ```lang\n...\n```
+  s = s.replace(/```[\w]*\n([\s\S]*?)```/g, '<pre>$1</pre>');
+  // Line breaks
+  s = s.replace(/\n/g, '<br>');
+  return s;
 }
 
 async function sendChat() {
@@ -1153,6 +1176,7 @@ async function sendChat() {
 
   const box = document.getElementById('chat-messages');
   input.value = '';
+  input.style.height = 'auto';
 
   // User bubble
   box.innerHTML += `<div class="msg msg-user">${escHtml(msg)}</div>`;
@@ -1178,7 +1202,7 @@ async function sendChat() {
     if (data.error) {
       box.innerHTML += `<div class="msg msg-bot" style="color:var(--danger)">${escHtml(data.error)}</div>`;
     } else {
-      box.innerHTML += `<div class="msg msg-bot">${escHtml(data.reply)}</div>`;
+      box.innerHTML += `<div class="msg msg-bot">${formatReply(data.reply)}</div>`;
     }
   } catch (err) {
     document.getElementById(typingId)?.remove();
