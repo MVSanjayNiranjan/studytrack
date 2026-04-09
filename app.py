@@ -110,6 +110,19 @@ def send_password_reset_email(to_email, username, code):
     )
 
 
+def send_username_reminder_email(to_email, code):
+    send_email(
+        to_email,
+        "StudyTrack username reminder code",
+        (
+            f"Hi,\n\n"
+            f"Your StudyTrack username reminder code is: {code}\n\n"
+            "It expires in 10 minutes.\n\n"
+            "If you did not request this, you can ignore this email."
+        ),
+    )
+
+
 def ensure_user_email_verification_columns():
     conn = get_db()
     cur = conn.cursor()
@@ -119,6 +132,8 @@ def ensure_user_email_verification_columns():
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_expires_at TIMESTAMPTZ")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_code TEXT")
     cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS username_reminder_code TEXT")
+    cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS username_reminder_expires_at TIMESTAMPTZ")
     cur.execute(
         "CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx "
         "ON users (email) WHERE email IS NOT NULL"
@@ -408,6 +423,102 @@ def reset_password():
         cur.close()
         conn.close()
         return jsonify({"message": "Password reset successful. You can now log in."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# POST /api/forgot-username
+# Body: { "email": "..." }
+# ─────────────────────────────────────────────
+@app.route("/api/forgot-username", methods=["POST"])
+def forgot_username():
+    data = request.get_json()
+    email = data.get("email", "").strip().lower()
+
+    if not email:
+        return jsonify({"error": "Email required"}), 400
+
+    if not is_valid_email(email):
+        return jsonify({"error": "Enter a valid email address"}), 400
+
+    conn = None
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+        row = cur.fetchone()
+
+        if row:
+            user_id = row[0]
+            reminder_code = generate_verification_code()
+            expires_at = datetime.utcnow() + timedelta(minutes=10)
+            cur.execute(
+                "UPDATE users SET username_reminder_code = %s, username_reminder_expires_at = %s WHERE id = %s",
+                (reminder_code, expires_at, user_id)
+            )
+            send_username_reminder_email(email, reminder_code)
+            conn.commit()
+
+        cur.close()
+        conn.close()
+        return jsonify({"message": "If an account exists for that email, a code has been sent."}), 200
+    except Exception as e:
+        if conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# POST /api/verify-forgot-username
+# Body: { "email": "...", "code": "123456" }
+# Returns: { "username": "..." }
+# ─────────────────────────────────────────────
+@app.route("/api/verify-forgot-username", methods=["POST"])
+def verify_forgot_username():
+    data = request.get_json()
+    email = data.get("email", "").strip().lower()
+    code = data.get("code", "").strip()
+
+    if not email or not code:
+        return jsonify({"error": "Email and code required"}), 400
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT username, username_reminder_code, username_reminder_expires_at FROM users WHERE email = %s",
+            (email,)
+        )
+        row = cur.fetchone()
+
+        if row is None:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid request"}), 400
+
+        username, stored_code, expires_at = row
+
+        if stored_code != code:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Invalid code"}), 400
+
+        now = datetime.now(expires_at.tzinfo) if expires_at and getattr(expires_at, "tzinfo", None) else datetime.utcnow()
+        if expires_at is None or expires_at < now:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Code expired. Request a new one."}), 400
+
+        cur.execute(
+            "UPDATE users SET username_reminder_code = NULL, username_reminder_expires_at = NULL WHERE email = %s",
+            (email,)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"username": username}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

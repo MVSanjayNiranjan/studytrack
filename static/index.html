@@ -196,7 +196,7 @@
       <div class="auth-tab" onclick="switchAuthTab('register')">Register</div>
     </div>
     <form id="auth-form" onsubmit="handleAuth(event)">
-      <div class="field">
+      <div class="field" id="username-field">
         <label>Username</label>
         <input type="text" id="auth-username" placeholder="Enter username" autocomplete="username" required />
       </div>
@@ -219,9 +219,15 @@
       <div id="forgot-actions" style="display:none;margin-bottom:14px;gap:8px;flex-wrap:wrap">
         <button class="btn btn-outline btn-sm" type="button" onclick="sendResetCode()">Send Reset Code</button>
       </div>
+      <div id="forgot-username-actions" style="display:none;margin-bottom:14px;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" type="button" onclick="sendUsernameCode()">Send Code</button>
+      </div>
       <button class="btn btn-primary" id="auth-btn" type="submit">Login</button>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" id="forgot-link" type="button" onclick="switchAuthTab('forgot')">Forgot Password?</button>
+        <div id="forgot-links" style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" id="forgot-link" type="button" onclick="switchAuthTab('forgot')">Forgot Password?</button>
+          <button class="btn btn-outline btn-sm" id="forgot-username-link" type="button" onclick="switchAuthTab('forgot-username')">Forgot Username?</button>
+        </div>
         <button class="btn btn-outline btn-sm" id="back-login-link" type="button" onclick="switchAuthTab('login')" style="display:none">Back to Login</button>
       </div>
     </form>
@@ -466,69 +472,81 @@ let authMode = 'login';
 
 function switchAuthTab(mode) {
   authMode = mode;
-  document.querySelectorAll('.auth-tab').forEach((t, i) => {
-    t.classList.toggle('active', (i === 0 && (mode === 'login' || mode === 'forgot')) || (i === 1 && (mode === 'register' || mode === 'verify')));
+  document.querySelectorAll(‘.auth-tab’).forEach((t, i) => {
+    t.classList.toggle(‘active’, (i === 0 && (mode === ‘login’ || mode === ‘forgot’ || mode === ‘forgot-username’)) || (i === 1 && (mode === ‘register’ || mode === ‘verify’)));
   });
 
-  const emailField = document.getElementById('email-field');
-  const passwordField = document.getElementById('password-field');
-  const codeField = document.getElementById('code-field');
-  const verifyActions = document.getElementById('verify-actions');
-  const forgotActions = document.getElementById('forgot-actions');
-  const help = document.getElementById('auth-help');
-  const btn = document.getElementById('auth-btn');
-  const forgotLink = document.getElementById('forgot-link');
-  const backLoginLink = document.getElementById('back-login-link');
-  const passwordInput = document.getElementById('auth-password');
-  const emailInput = document.getElementById('auth-email');
-  const codeInput = document.getElementById('auth-code');
-  const passwordLabel = document.getElementById('auth-password-label');
-  const codeLabel = document.getElementById('auth-code-label');
+  const usernameField = document.getElementById(‘username-field’);
+  const emailField = document.getElementById(‘email-field’);
+  const passwordField = document.getElementById(‘password-field’);
+  const codeField = document.getElementById(‘code-field’);
+  const verifyActions = document.getElementById(‘verify-actions’);
+  const forgotActions = document.getElementById(‘forgot-actions’);
+  const forgotUsernameActions = document.getElementById(‘forgot-username-actions’);
+  const forgotLinks = document.getElementById(‘forgot-links’);
+  const help = document.getElementById(‘auth-help’);
+  const btn = document.getElementById(‘auth-btn’);
+  const backLoginLink = document.getElementById(‘back-login-link’);
+  const passwordInput = document.getElementById(‘auth-password’);
+  const usernameInput = document.getElementById(‘auth-username’);
+  const emailInput = document.getElementById(‘auth-email’);
+  const codeInput = document.getElementById(‘auth-code’);
+  const passwordLabel = document.getElementById(‘auth-password-label’);
+  const codeLabel = document.getElementById(‘auth-code-label’);
 
-  emailField.style.display = mode === 'login' ? 'none' : 'block';
-  passwordField.style.display = mode === 'verify' ? 'none' : 'block';
-  codeField.style.display = (mode === 'verify' || mode === 'forgot') ? 'block' : 'none';
-  verifyActions.style.display = mode === 'verify' ? 'block' : 'none';
-  forgotActions.style.display = mode === 'forgot' ? 'flex' : 'none';
-  forgotLink.style.display = mode === 'login' ? 'inline-flex' : 'none';
-  backLoginLink.style.display = mode === 'login' ? 'none' : 'inline-flex';
+  usernameField.style.display = mode === ‘forgot-username’ ? ‘none’ : ‘block’;
+  emailField.style.display = mode === ‘login’ ? ‘none’ : ‘block’;
+  passwordField.style.display = (mode === ‘verify’ || mode === ‘forgot-username’) ? ‘none’ : ‘block’;
+  codeField.style.display = (mode === ‘verify’ || mode === ‘forgot’ || mode === ‘forgot-username’) ? ‘block’ : ‘none’;
+  verifyActions.style.display = mode === ‘verify’ ? ‘block’ : ‘none’;
+  forgotActions.style.display = mode === ‘forgot’ ? ‘flex’ : ‘none’;
+  forgotUsernameActions.style.display = mode === ‘forgot-username’ ? ‘flex’ : ‘none’;
+  forgotLinks.style.display = mode === ‘login’ ? ‘flex’ : ‘none’;
+  backLoginLink.style.display = mode === ‘login’ ? ‘none’ : ‘inline-flex’;
 
-  emailInput.required = mode !== 'login';
-  passwordInput.required = mode !== 'verify';
-  codeInput.required = mode === 'verify' || mode === 'forgot';
+  usernameInput.required = mode !== ‘forgot-username’;
+  emailInput.required = mode !== ‘login’;
+  passwordInput.required = mode !== ‘verify’ && mode !== ‘forgot-username’;
+  codeInput.required = mode === ‘verify’ || mode === ‘forgot’ || mode === ‘forgot-username’;
 
-  if (mode === 'login') {
-    btn.textContent = 'Login';
-    help.style.display = 'none';
-    passwordInput.autocomplete = 'current-password';
-    passwordLabel.textContent = 'Password';
-    passwordInput.placeholder = 'Enter password';
-    codeLabel.textContent = 'Verification Code';
-    codeInput.placeholder = 'Enter 6-digit code';
-  } else if (mode === 'register') {
-    btn.textContent = 'Create Account';
-    help.style.display = 'block';
-    help.textContent = 'We’ll send a 6-digit verification code to your email after sign-up.';
-    passwordInput.autocomplete = 'new-password';
-    passwordLabel.textContent = 'Password';
-    passwordInput.placeholder = 'Enter password';
-    codeLabel.textContent = 'Verification Code';
-    codeInput.placeholder = 'Enter 6-digit code';
-  } else if (mode === 'verify') {
-    btn.textContent = 'Verify Email';
-    help.style.display = 'block';
-    help.textContent = 'Enter the verification code from your inbox to activate your account.';
-    codeLabel.textContent = 'Verification Code';
-    codeInput.placeholder = 'Enter 6-digit code';
+  if (mode === ‘login’) {
+    btn.textContent = ‘Login’;
+    help.style.display = ‘none’;
+    passwordInput.autocomplete = ‘current-password’;
+    passwordLabel.textContent = ‘Password’;
+    passwordInput.placeholder = ‘Enter password’;
+    codeLabel.textContent = ‘Verification Code’;
+    codeInput.placeholder = ‘Enter 6-digit code’;
+  } else if (mode === ‘register’) {
+    btn.textContent = ‘Create Account’;
+    help.style.display = ‘block’;
+    help.textContent = ‘We’ll send a 6-digit verification code to your email after sign-up.’;
+    passwordInput.autocomplete = ‘new-password’;
+    passwordLabel.textContent = ‘Password’;
+    passwordInput.placeholder = ‘Enter password’;
+    codeLabel.textContent = ‘Verification Code’;
+    codeInput.placeholder = ‘Enter 6-digit code’;
+  } else if (mode === ‘verify’) {
+    btn.textContent = ‘Verify Email’;
+    help.style.display = ‘block’;
+    help.textContent = ‘Enter the verification code from your inbox to activate your account.’;
+    codeLabel.textContent = ‘Verification Code’;
+    codeInput.placeholder = ‘Enter 6-digit code’;
+  } else if (mode === ‘forgot’) {
+    btn.textContent = ‘Reset Password’;
+    help.style.display = ‘block’;
+    help.textContent = ‘Send a reset code to your email, then enter it with your new password.’;
+    passwordInput.autocomplete = ‘new-password’;
+    passwordLabel.textContent = ‘New Password’;
+    passwordInput.placeholder = ‘Enter new password’;
+    codeLabel.textContent = ‘Reset Code’;
+    codeInput.placeholder = ‘Enter reset code’;
   } else {
-    btn.textContent = 'Reset Password';
-    help.style.display = 'block';
-    help.textContent = 'Send a reset code to your email, then enter it with your new password.';
-    passwordInput.autocomplete = 'new-password';
-    passwordLabel.textContent = 'New Password';
-    passwordInput.placeholder = 'Enter new password';
-    codeLabel.textContent = 'Reset Code';
-    codeInput.placeholder = 'Enter reset code';
+    btn.textContent = ‘Reveal Username’;
+    help.style.display = ‘block’;
+    help.textContent = ‘Enter your email to receive a verification code, then reveal your username.’;
+    codeLabel.textContent = ‘Verification Code’;
+    codeInput.placeholder = ‘Enter 6-digit code’;
   }
 }
 
@@ -564,6 +582,13 @@ async function handleAuth(e) {
     }
     endpoint = '/api/reset-password';
     payload = { email, code, new_password: password };
+  } else if (authMode === 'forgot-username') {
+    if (!email || !code) {
+      toast('Email and verification code are required.', 'error');
+      return;
+    }
+    endpoint = '/api/verify-forgot-username';
+    payload = { email, code };
   } else if (!username || !password) {
     toast('Username and password are required.', 'error');
     return;
@@ -611,6 +636,14 @@ async function handleAuth(e) {
       return;
     }
 
+    if (authMode === 'forgot-username') {
+      toast(`Your username is: ${data.username}`, 'success');
+      document.getElementById('auth-code').value = '';
+      document.getElementById('auth-username').value = data.username;
+      switchAuthTab('login');
+      return;
+    }
+
     localStorage.setItem('st_token', data.token);
     localStorage.setItem('st_username', data.username);
     token = data.token;
@@ -620,7 +653,7 @@ async function handleAuth(e) {
     toast('Cannot reach server. Is Flask running?', 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = authMode === 'login' ? 'Login' : authMode === 'register' ? 'Create Account' : authMode === 'verify' ? 'Verify Email' : 'Reset Password';
+    btn.textContent = authMode === 'login' ? 'Login' : authMode === 'register' ? 'Create Account' : authMode === 'verify' ? 'Verify Email' : authMode === 'forgot-username' ? 'Reveal Username' : 'Reset Password';
   }
 }
 
@@ -676,6 +709,33 @@ async function sendResetCode() {
     toast(data.message || 'If the email exists, a reset code has been sent.', 'success');
   } catch (err) {
     toast('Could not send the reset code right now.', 'error');
+  }
+}
+
+async function sendUsernameCode() {
+  const email = document.getElementById('auth-email').value.trim();
+
+  if (!email) {
+    toast('Enter your email first.', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/forgot-username', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast(data.error || 'Could not send the code.', 'error');
+      return;
+    }
+
+    toast(data.message || 'If the email exists, a code has been sent.', 'success');
+  } catch (err) {
+    toast('Could not send the code right now.', 'error');
   }
 }
 
