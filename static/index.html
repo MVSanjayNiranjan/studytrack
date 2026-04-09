@@ -472,81 +472,81 @@ let authMode = 'login';
 
 function switchAuthTab(mode) {
   authMode = mode;
-  document.querySelectorAll(‘.auth-tab’).forEach((t, i) => {
-    t.classList.toggle(‘active’, (i === 0 && (mode === ‘login’ || mode === ‘forgot’ || mode === ‘forgot-username’)) || (i === 1 && (mode === ‘register’ || mode === ‘verify’)));
+  document.querySelectorAll('.auth-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && (mode === 'login' || mode === 'forgot' || mode === 'forgot-username')) || (i === 1 && (mode === 'register' || mode === 'verify')));
   });
 
-  const usernameField = document.getElementById(‘username-field’);
-  const emailField = document.getElementById(‘email-field’);
-  const passwordField = document.getElementById(‘password-field’);
-  const codeField = document.getElementById(‘code-field’);
-  const verifyActions = document.getElementById(‘verify-actions’);
-  const forgotActions = document.getElementById(‘forgot-actions’);
-  const forgotUsernameActions = document.getElementById(‘forgot-username-actions’);
-  const forgotLinks = document.getElementById(‘forgot-links’);
-  const help = document.getElementById(‘auth-help’);
-  const btn = document.getElementById(‘auth-btn’);
-  const backLoginLink = document.getElementById(‘back-login-link’);
-  const passwordInput = document.getElementById(‘auth-password’);
-  const usernameInput = document.getElementById(‘auth-username’);
-  const emailInput = document.getElementById(‘auth-email’);
-  const codeInput = document.getElementById(‘auth-code’);
-  const passwordLabel = document.getElementById(‘auth-password-label’);
-  const codeLabel = document.getElementById(‘auth-code-label’);
+  const usernameField = document.getElementById('username-field');
+  const emailField = document.getElementById('email-field');
+  const passwordField = document.getElementById('password-field');
+  const codeField = document.getElementById('code-field');
+  const verifyActions = document.getElementById('verify-actions');
+  const forgotActions = document.getElementById('forgot-actions');
+  const forgotUsernameActions = document.getElementById('forgot-username-actions');
+  const forgotLinks = document.getElementById('forgot-links');
+  const help = document.getElementById('auth-help');
+  const btn = document.getElementById('auth-btn');
+  const backLoginLink = document.getElementById('back-login-link');
+  const passwordInput = document.getElementById('auth-password');
+  const usernameInput = document.getElementById('auth-username');
+  const emailInput = document.getElementById('auth-email');
+  const codeInput = document.getElementById('auth-code');
+  const passwordLabel = document.getElementById('auth-password-label');
+  const codeLabel = document.getElementById('auth-code-label');
 
-  usernameField.style.display = mode === ‘forgot-username’ ? ‘none’ : ‘block’;
-  emailField.style.display = mode === ‘login’ ? ‘none’ : ‘block’;
-  passwordField.style.display = (mode === ‘verify’ || mode === ‘forgot-username’) ? ‘none’ : ‘block’;
-  codeField.style.display = (mode === ‘verify’ || mode === ‘forgot’ || mode === ‘forgot-username’) ? ‘block’ : ‘none’;
-  verifyActions.style.display = mode === ‘verify’ ? ‘block’ : ‘none’;
-  forgotActions.style.display = mode === ‘forgot’ ? ‘flex’ : ‘none’;
-  forgotUsernameActions.style.display = mode === ‘forgot-username’ ? ‘flex’ : ‘none’;
-  forgotLinks.style.display = mode === ‘login’ ? ‘flex’ : ‘none’;
-  backLoginLink.style.display = mode === ‘login’ ? ‘none’ : ‘inline-flex’;
+  usernameField.style.display = mode === 'forgot-username' ? 'none' : 'block';
+  emailField.style.display = mode === 'login' ? 'none' : 'block';
+  passwordField.style.display = (mode === 'verify' || mode === 'forgot-username') ? 'none' : 'block';
+  codeField.style.display = (mode === 'verify' || mode === 'forgot' || mode === 'forgot-username') ? 'block' : 'none';
+  verifyActions.style.display = mode === 'verify' ? 'block' : 'none';
+  forgotActions.style.display = mode === 'forgot' ? 'flex' : 'none';
+  forgotUsernameActions.style.display = mode === 'forgot-username' ? 'flex' : 'none';
+  forgotLinks.style.display = mode === 'login' ? 'flex' : 'none';
+  backLoginLink.style.display = mode === 'login' ? 'none' : 'inline-flex';
 
-  usernameInput.required = mode !== ‘forgot-username’;
-  emailInput.required = mode !== ‘login’;
-  passwordInput.required = mode !== ‘verify’ && mode !== ‘forgot-username’;
-  codeInput.required = mode === ‘verify’ || mode === ‘forgot’ || mode === ‘forgot-username’;
+  usernameInput.required = mode !== 'forgot-username';
+  emailInput.required = mode !== 'login';
+  passwordInput.required = mode !== 'verify' && mode !== 'forgot-username';
+  codeInput.required = mode === 'verify' || mode === 'forgot' || mode === 'forgot-username';
 
-  if (mode === ‘login’) {
-    btn.textContent = ‘Login’;
-    help.style.display = ‘none’;
-    passwordInput.autocomplete = ‘current-password’;
-    passwordLabel.textContent = ‘Password’;
-    passwordInput.placeholder = ‘Enter password’;
-    codeLabel.textContent = ‘Verification Code’;
-    codeInput.placeholder = ‘Enter 6-digit code’;
-  } else if (mode === ‘register’) {
-    btn.textContent = ‘Create Account’;
-    help.style.display = ‘block’;
-    help.textContent = ‘We’ll send a 6-digit verification code to your email after sign-up.’;
-    passwordInput.autocomplete = ‘new-password’;
-    passwordLabel.textContent = ‘Password’;
-    passwordInput.placeholder = ‘Enter password’;
-    codeLabel.textContent = ‘Verification Code’;
-    codeInput.placeholder = ‘Enter 6-digit code’;
-  } else if (mode === ‘verify’) {
-    btn.textContent = ‘Verify Email’;
-    help.style.display = ‘block’;
-    help.textContent = ‘Enter the verification code from your inbox to activate your account.’;
-    codeLabel.textContent = ‘Verification Code’;
-    codeInput.placeholder = ‘Enter 6-digit code’;
-  } else if (mode === ‘forgot’) {
-    btn.textContent = ‘Reset Password’;
-    help.style.display = ‘block’;
-    help.textContent = ‘Send a reset code to your email, then enter it with your new password.’;
-    passwordInput.autocomplete = ‘new-password’;
-    passwordLabel.textContent = ‘New Password’;
-    passwordInput.placeholder = ‘Enter new password’;
-    codeLabel.textContent = ‘Reset Code’;
-    codeInput.placeholder = ‘Enter reset code’;
+  if (mode === 'login') {
+    btn.textContent = 'Login';
+    help.style.display = 'none';
+    passwordInput.autocomplete = 'current-password';
+    passwordLabel.textContent = 'Password';
+    passwordInput.placeholder = 'Enter password';
+    codeLabel.textContent = 'Verification Code';
+    codeInput.placeholder = 'Enter 6-digit code';
+  } else if (mode === 'register') {
+    btn.textContent = 'Create Account';
+    help.style.display = 'block';
+    help.textContent = "We'll send a 6-digit verification code to your email after sign-up.";
+    passwordInput.autocomplete = 'new-password';
+    passwordLabel.textContent = 'Password';
+    passwordInput.placeholder = 'Enter password';
+    codeLabel.textContent = 'Verification Code';
+    codeInput.placeholder = 'Enter 6-digit code';
+  } else if (mode === 'verify') {
+    btn.textContent = 'Verify Email';
+    help.style.display = 'block';
+    help.textContent = 'Enter the verification code from your inbox to activate your account.';
+    codeLabel.textContent = 'Verification Code';
+    codeInput.placeholder = 'Enter 6-digit code';
+  } else if (mode === 'forgot') {
+    btn.textContent = 'Reset Password';
+    help.style.display = 'block';
+    help.textContent = 'Send a reset code to your email, then enter it with your new password.';
+    passwordInput.autocomplete = 'new-password';
+    passwordLabel.textContent = 'New Password';
+    passwordInput.placeholder = 'Enter new password';
+    codeLabel.textContent = 'Reset Code';
+    codeInput.placeholder = 'Enter reset code';
   } else {
-    btn.textContent = ‘Reveal Username’;
-    help.style.display = ‘block’;
-    help.textContent = ‘Enter your email to receive a verification code, then reveal your username.’;
-    codeLabel.textContent = ‘Verification Code’;
-    codeInput.placeholder = ‘Enter 6-digit code’;
+    btn.textContent = 'Reveal Username';
+    help.style.display = 'block';
+    help.textContent = 'Enter your email to receive a verification code, then reveal your username.';
+    codeLabel.textContent = 'Verification Code';
+    codeInput.placeholder = 'Enter 6-digit code';
   }
 }
 
