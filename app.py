@@ -146,6 +146,37 @@ def ensure_user_email_verification_columns():
 ensure_user_email_verification_columns()
 
 
+def ensure_chat_tables():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id SERIAL PRIMARY KEY,
+            session_id INTEGER NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+            role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+            content TEXT NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
+try:
+    ensure_chat_tables()
+except Exception:
+    pass
+
+
 # ─────────────────────────────────────────────
 # Serve frontend
 # ─────────────────────────────────────────────
@@ -783,48 +814,183 @@ def update_task(task_id):
 
 
 # ─────────────────────────────────────────────
+# GET  /api/chat/sessions       – list sessions
+# POST /api/chat/sessions       – create session
+# ─────────────────────────────────────────────
+@app.route("/api/chat/sessions", methods=["GET", "POST"])
+@jwt_required()
+def chat_sessions():
+    user_id = int(get_jwt_identity())
+
+    if request.method == "GET":
+        try:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT id, title, created_at FROM chat_sessions "
+                "WHERE user_id = %s ORDER BY created_at DESC",
+                (user_id,)
+            )
+            rows = cur.fetchall()
+            cur.close()
+            conn.close()
+            return jsonify([
+                {"id": r[0], "title": r[1], "created_at": str(r[2])}
+                for r in rows
+            ]), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    data = request.get_json()
+    title = (data.get("title", "") or "New Chat").strip() or "New Chat"
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO chat_sessions (user_id, title) VALUES (%s, %s) RETURNING id, created_at",
+            (user_id, title)
+        )
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"id": row[0], "title": title, "created_at": str(row[1])}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# DELETE /api/chat/sessions/<id>
+# ─────────────────────────────────────────────
+@app.route("/api/chat/sessions/<int:session_id>", methods=["DELETE"])
+@jwt_required()
+def delete_chat_session(session_id):
+    user_id = int(get_jwt_identity())
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM chat_sessions WHERE id = %s AND user_id = %s",
+            (session_id, user_id)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({"message": "Deleted"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
+# GET /api/chat/sessions/<id>/messages
+# ─────────────────────────────────────────────
+@app.route("/api/chat/sessions/<int:session_id>/messages", methods=["GET"])
+@jwt_required()
+def chat_session_messages(session_id):
+    user_id = int(get_jwt_identity())
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id FROM chat_sessions WHERE id = %s AND user_id = %s",
+            (session_id, user_id)
+        )
+        if not cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Not found"}), 404
+        cur.execute(
+            "SELECT role, content FROM chat_messages "
+            "WHERE session_id = %s ORDER BY created_at ASC",
+            (session_id,)
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify([{"role": r[0], "content": r[1]} for r in rows]), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────
 # POST /api/ai_coach
-# Body: { "message": "How should I study for my Math exam?" }
-# Returns: { "reply": "..." }
+# Body: { "message": "...", "session_id": null|int }
+# Returns: { "reply": "...", "session_id": int }
 # ─────────────────────────────────────────────
 @app.route("/api/ai_coach", methods=["POST"])
 @jwt_required()
 def ai_coach():
+    user_id = int(get_jwt_identity())
     data = request.get_json()
     user_message = data.get("message", "").strip()
+    session_id = data.get("session_id")
 
     if not user_message:
         return jsonify({"error": "message required"}), 400
 
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
-        return jsonify({"reply": "AI coach is not configured yet. Add your GROQ_API_KEY in Render environment variables."}), 200
+        return jsonify({"reply": "AI coach is not configured. Add GROQ_API_KEY.", "session_id": session_id}), 200
 
     try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Create a new session automatically on first message
+        if not session_id:
+            title = user_message[:60]
+            cur.execute(
+                "INSERT INTO chat_sessions (user_id, title) VALUES (%s, %s) RETURNING id",
+                (user_id, title)
+            )
+            session_id = cur.fetchone()[0]
+            conn.commit()
+
+        # Load conversation history for context
+        cur.execute(
+            "SELECT role, content FROM chat_messages "
+            "WHERE session_id = %s ORDER BY created_at ASC",
+            (session_id,)
+        )
+        history = [{"role": r[0], "content": r[1]} for r in cur.fetchall()]
+
+        # Save the user message
+        cur.execute(
+            "INSERT INTO chat_messages (session_id, role, content) VALUES (%s, 'user', %s)",
+            (session_id, user_message)
+        )
+        conn.commit()
+
+        system_prompt = (
+            "You are StudyCoach, a knowledgeable AI assistant for students. "
+            "You can help with: study techniques, time management, exam prep, motivation, "
+            "mathematics, science, coding and programming (any language), writing, and any academic subject. "
+            "Format every response for readability:\n"
+            "- Use numbered lists (1. 2. 3.) or bullet points (-) for multiple steps or tips, each on its own line.\n"
+            "- Use **bold** for key terms or important points.\n"
+            "- For code, wrap it in triple backticks with the language name.\n"
+            "- Separate distinct sections with a blank line.\n"
+            "Be clear, practical, and thorough. Do not cram everything into one paragraph."
+        )
+
         client = Groq(api_key=api_key)
         chat = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             max_tokens=1024,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are StudyCoach, a knowledgeable AI assistant for students. "
-                        "You can help with: study techniques, time management, exam prep, motivation, "
-                        "mathematics, science, coding and programming (any language), writing, and any academic subject. "
-                        "Format every response for readability:\n"
-                        "- Use numbered lists (1. 2. 3.) or bullet points (-) for multiple steps or tips, each on its own line.\n"
-                        "- Use **bold** for key terms or important points.\n"
-                        "- For code, wrap it in triple backticks with the language name.\n"
-                        "- Separate distinct sections with a blank line.\n"
-                        "Be clear, practical, and thorough. Do not cram everything into one paragraph."
-                    )
-                },
-                {"role": "user", "content": user_message}
-            ]
+            messages=[{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": user_message}]
         )
         reply = chat.choices[0].message.content
-        return jsonify({"reply": reply}), 200
+
+        # Save the assistant reply
+        cur.execute(
+            "INSERT INTO chat_messages (session_id, role, content) VALUES (%s, 'assistant', %s)",
+            (session_id, reply)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({"reply": reply, "session_id": session_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
